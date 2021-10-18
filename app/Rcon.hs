@@ -10,7 +10,7 @@ import Control.Concurrent(threadDelay)
 
 type Port = Int
 
-data RequestType = Auth | Command | AuthResponse | CommandResponse
+data RequestType = Auth | Command | AuthResponse | CommandResponse deriving Show
 
 requestToInt :: RequestType -> Int32
 requestToInt req =
@@ -36,16 +36,16 @@ data Connection = Connection {
     port :: Port,
     adress :: HostName,
     password :: String
-}
+} deriving Show
 
 data Packet = Packet {
     size :: Int32,
     packetId :: Int32,
     reqType :: RequestType,
     body :: String
-}
+} deriving Show
 
-data ConnErr = BadPassword | ConnError
+data ConnErr = BadPassword | ConnError deriving Show
 
 newConn :: Port -> HostName -> String -> IO (Either ConnErr Connection)
 newConn port adress pwd =
@@ -54,8 +54,15 @@ newConn port adress pwd =
             send socket (createPackage pwd 1293128 Auth)
             response <- getServerPacket socket Nothing
             case response of
-                Just r -> return $ return (Connection {port = port, adress = adress, password = pwd})
-                Nothing -> 
+                Just r -> do
+                    newResM <- getServerPacket socket Nothing
+                    case newResM of
+                        Just newRes ->
+                            if packetId newRes /= -1 then
+                                return $ return (Connection {port = port, adress = adress, password = pwd})
+                            else return $ Left BadPassword
+                        Nothing -> return $ Left ConnError
+                Nothing -> return $ Left ConnError
 
     where
         errHandler :: SomeException -> IO (Either ConnErr Connection)
@@ -79,8 +86,8 @@ getServerPacket socket idM = do
                 Just rest -> do
                     let id = decodeS $ B.take 4 rest :: Int32
                     let reqType = (intToRequestReceive . decodeS . B.take 4 . snd . B.splitAt 4) rest
-                    let body = (decodeS . takeUntilDoubleNullExt . snd . B.splitAt 8) rest
-                    return $ Packet (fromIntegral size) id <$> reqType <*> return body
+                    let body = (fmap decodeS . takeUntilDoubleNullExt . snd . B.splitAt 8) rest
+                    return $ Packet (fromIntegral size) id <$> reqType <*> body
                 Nothing -> return Nothing
         Nothing -> return Nothing
     
@@ -88,7 +95,9 @@ getServerPacket socket idM = do
         takeUntilDoubleNullExt bs = takeUntilDoubleNull bs bs
         takeUntilDoubleNull bs total =
             let isDoubleNull = ((== "\0\0") . UTF8.toString . B.take 2) bs in
-            if isDoubleNull then lastX 2 total else takeUntilDoubleNull (snd $ B.splitAt 1 bs) total
+            if B.length bs < 2 then
+                if isDoubleNull then return $ lastX 2 total else takeUntilDoubleNull (snd $ B.splitAt 1 bs) total
+            else Nothing
         lastX num bs =
             B.take (B.length bs - num) bs
         decodeS :: Binary a => B.ByteString -> a
