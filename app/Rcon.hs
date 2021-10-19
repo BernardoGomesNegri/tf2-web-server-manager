@@ -6,7 +6,7 @@ import qualified Data.ByteString.UTF8 as UTF8
 import Data.Int as Int
 import Data.Binary
 import LeEncoding
-import Control.Exception (handle, SomeException (SomeException))
+import Control.Exception (handle, SomeException (SomeException), throwIO)
 import Control.Concurrent(threadDelay)
 import System.Random(randomIO)
 import Control.Monad (join)
@@ -122,7 +122,7 @@ getServerPacket socket idM = do
                         Nothing -> toDo
                 Nothing -> return Nothing
         Nothing -> return Nothing
-    
+
     where
         takeUntilDoubleNull bs = B.take (B.length bs - 2) bs
 
@@ -140,16 +140,20 @@ createPackage command idInt reqType =
 sendCmd :: String -> Connection -> IO (Maybe String)
 sendCmd body conn =
     join <$>
-    (withConn conn $ \socket -> do
+    withConn conn (\socket -> do
         id <- randomIO
         let package = createPackage body id Command
+        let dummyPackage = createPackage "" 0 CommandResponse
         send socket package
-        response <- getServerPacket socket (Just id)
-        case response of
-            Just (Packet {reqType = reqType, body = body}) ->
-                case reqType of
-                    CommandResponse ->
-                        return $ return body
-                    _ -> return Nothing
-            _ -> return Nothing)
-
+        send socket dummyPackage
+        let go total = do
+                response <- getServerPacket socket (Just id)
+                let result = (case response of
+                        Just Packet {reqType = reqType, body = body} ->
+                            case reqType of
+                                CommandResponse -> do
+                                    if body == "" then return $ return (total ++ body) else go (total ++ body)
+                                _ -> return Nothing
+                        _ -> return $ Just (total ++ body))
+                result
+        go "")
