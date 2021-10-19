@@ -26,6 +26,7 @@ executable tf2-server-manager
 
     -- Modules included in this executable, other than Main.
     other-modules: Rcon
+    other-modules: LeEncoding
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
