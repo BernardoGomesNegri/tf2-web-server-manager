@@ -94,7 +94,7 @@ getServerPacket socket idM = do
             case stuff of
                 Just x -> do
                     let newTotal = B.concat [total,x]
-                    if B.length x < s then threadDelay 100000 >> go (count + 1) newTotal s else
+                    if B.length x < s && count < 6 then threadDelay 100000 >> go (count + 1) newTotal s else
                         return $ return newTotal
                 Nothing ->
                     if count < 6 then threadDelay 100000 >> go (count + 1) total s else return Nothing
