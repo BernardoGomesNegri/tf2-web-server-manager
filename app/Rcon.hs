@@ -6,7 +6,7 @@ import qualified Data.ByteString.UTF8 as UTF8
 import Data.Int as Int
 import Data.Binary
 import LeEncoding
-import Control.Exception (handle, SomeException (SomeException), throwIO)
+import Control.Exception (handle, SomeException (SomeException))
 import Control.Concurrent(threadDelay)
 import System.Random(randomIO)
 import Control.Monad (join)
