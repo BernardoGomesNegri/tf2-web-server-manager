@@ -8,10 +8,37 @@ import Data.Binary
 import LeEncoding
 import Control.Exception (handle, SomeException (SomeException))
 import Control.Concurrent(threadDelay)
+import System.Random(randomIO)
+import Control.Monad (join)
 
 type Port = Int
 
 data RequestType = Auth | Command | AuthResponse | CommandResponse deriving Show
+
+data Connection = Connection {
+    port :: Port,
+    adress :: HostName,
+    password :: String
+} deriving Show
+
+data Packet = Packet {
+    size :: Int32,
+    packetId :: Int32,
+    reqType :: RequestType,
+    body :: String
+} deriving Show
+
+data ConnErr = BadPassword | UnexpectedResponse | ConnError String deriving Show
+
+withConn :: Connection -> (Socket -> IO a) -> IO (Maybe a)
+withConn conn@Connection {adress = adress, port = port, password = pwd} action = do
+    connect adress (show port) $ \(socket,_) -> do
+        authenticated <- authenticateConn conn socket
+        if authenticated then do
+            result <- action socket
+            return $ return result
+        else return Nothing
+
 
 requestToInt :: RequestType -> Int32
 requestToInt req =
@@ -33,55 +60,45 @@ intToRequestReceive 2 = return AuthResponse
 intToRequestReceive 3 = return Auth
 intToRequestReceive _ = Nothing
 
-data Connection = Connection {
-    port :: Port,
-    adress :: HostName,
-    password :: String
-} deriving Show
-
-data Packet = Packet {
-    size :: Int32,
-    packetId :: Int32,
-    reqType :: RequestType,
-    body :: String
-} deriving Show
-
-data ConnErr = BadPassword | UnexpectedResponse | ConnError String deriving Show
-
 newConn :: Port -> HostName -> String -> IO (Either ConnErr Connection)
 newConn port adress pwd =
     handle errHandler $
         connect adress (show port) $ \(socket,addr) -> do
-            send socket (createPackage pwd 1293128 Auth)
-            response <- getServerPacket socket Nothing
-            case response of
-                Just r -> do
-                    newResM <- getServerPacket socket Nothing
-                    case newResM of
-                        Just newRes ->
-                            if packetId newRes /= -1 then
-                                return $ return (Connection {port = port, adress = adress, password = pwd})
-                            else return $ Left BadPassword
-                        Nothing -> return $ Left UnexpectedResponse
-                Nothing -> return $ Left UnexpectedResponse
-
+            authenticated <- authenticateConn (Connection port adress pwd) socket
+            if authenticated then
+                return $ return (Connection port adress pwd)
+            else return $ Left BadPassword
     where
         errHandler :: SomeException -> IO (Either ConnErr Connection)
         errHandler e = return $ Left $ ConnError (show e)
 
+authenticateConn :: Connection -> Socket -> IO Bool
+authenticateConn Connection { port = port, adress = adress, password = pwd} socket = do
+    send socket (createPackage pwd 123123 Auth)
+    response <- getServerPacket socket Nothing
+    case response of
+        Just r -> do
+            newResM <- getServerPacket socket Nothing
+            case newResM of
+                Just newRes ->
+                    if packetId newRes /= -1 then
+                        return True
+                    else return False
+                Nothing -> return False
+        Nothing -> return False
+
 getServerPacket :: Socket -> Maybe Int32 -> IO (Maybe Packet)
 getServerPacket socket idM = do
-    let recsA :: Int -> B.ByteString -> Int -> IO (Maybe B.ByteString)
-        recsA count total s = do
+    let go count total s = do
             stuff <- recv socket s
             case stuff of
                 Just x -> do
                     let newTotal = B.concat [total,x]
-                    if B.length x < s then threadDelay 100000 >> recsA (count + 1) newTotal s else
+                    if B.length x < s then threadDelay 100000 >> go (count + 1) newTotal s else
                         return $ return newTotal
                 Nothing ->
-                    if count < 6 then threadDelay 100000 >> recsA (count + 1) total s else return Nothing
-    let recs = recsA 0 B.empty
+                    if count < 6 then threadDelay 100000 >> go (count + 1) total s else return Nothing
+    let recs = go 0 B.empty
     sM <- recs 4
     case sM of
         Just s -> do
@@ -90,23 +107,24 @@ getServerPacket socket idM = do
             case restM of
                 Just rest -> do
                     let id = intDecode $ B.take 4 rest :: Int32
-                    let reqType = (intToRequestReceive . intDecode . B.take 4 . snd . B.splitAt 4) rest
-                    let body = (UTF8.toString . takeUntilDoubleNullExt . snd . B.splitAt 8) rest
-                    case Packet (fromIntegral size) id <$> reqType <*> return body of
-                        Just s -> return $ return s
-                        Nothing -> fail "base"
-                Nothing -> fail "bas"
-        Nothing -> fail "bas"
+                    let toDo = do
+                            let reqType = (intToRequestReceive . intDecode . B.take 4 . snd . B.splitAt 4) rest
+                            let body = (UTF8.toString . takeUntilDoubleNull . snd . B.splitAt 8) rest
+                            case Packet (fromIntegral size) id <$> reqType <*> return body of
+                                Just s -> return $ return s
+                                Nothing -> return Nothing
+                    case idM of
+                        Just desiredId ->
+                            if id /= desiredId then
+                                return Nothing
+                            else
+                                toDo
+                        Nothing -> toDo
+                Nothing -> return Nothing
+        Nothing -> return Nothing
     
     where
-        takeUntilDoubleNullExt bs = B.take (B.length bs - 2) bs
-        takeUntilDoubleNull bs total =
-            let isDoubleNull = ((== "\0\0") . UTF8.toString . B.take 2) bs in
-            if B.length bs < 2 then
-                if isDoubleNull then return $ lastX 2 total else takeUntilDoubleNull (snd $ B.splitAt 1 bs) total
-            else Nothing
-        lastX num bs =
-            B.take (B.length bs - num) bs
+        takeUntilDoubleNull bs = B.take (B.length bs - 2) bs
 
 createPackage :: String -> Int32 -> RequestType -> B.ByteString
 createPackage command idInt reqType =
@@ -118,3 +136,20 @@ createPackage command idInt reqType =
         reqTypeInt = intEncode $ requestToInt reqType
         body = UTF8.fromString command
         null = UTF8.fromString "\0\0"
+
+sendCmd :: String -> Connection -> IO (Maybe String)
+sendCmd body conn =
+    join <$>
+    (withConn conn $ \socket -> do
+        id <- randomIO
+        let package = createPackage body id Command
+        send socket package
+        response <- getServerPacket socket (Just id)
+        case response of
+            Just (Packet {reqType = reqType, body = body}) ->
+                case reqType of
+                    CommandResponse ->
+                        return $ return body
+                    _ -> return Nothing
+            _ -> return Nothing)
+
