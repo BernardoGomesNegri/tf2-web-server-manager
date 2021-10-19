@@ -146,6 +146,7 @@ sendCmd body conn =
         let dummyPackage = createPackage "" 0 CommandResponse
         send socket package
         send socket dummyPackage
+        print $ "sent command: " ++ body ++ " to server"
         let go total = do
                 response <- getServerPacket socket (Just id)
                 let result = (case response of
