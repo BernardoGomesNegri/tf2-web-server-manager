@@ -68,7 +68,7 @@ api = do
         connM <- liftIO $ newConn port adressName pwd
         case connM of
             Right conn -> do
-                randomToken <- liftIO $ take 8 <$> randomString
+                randomToken <- liftIO $ randomString 25
                 liftIO $ print $ "adding random key: " ++ randomToken
                 webM $ modify $ \(State map) -> State $ Map.insert randomToken conn map
                 text $ pack randomToken
@@ -77,10 +77,10 @@ api = do
                 text "wrong password"
             Left e -> do
                 status status503
-                text $ "error: " `append` pack (show e)
+                text $ "error: " <> pack (show e)
 
-randomString :: IO String
-randomString =
+randomString :: Int -> IO String
+randomString size =
     let all = ['0'..'9'] ++ ['a'..'z'] ++ ['A'..'Z'] in
     let randomChar = (!!) all <$> getStdRandom (randomR (0, 61)) in
-    (sequenceA . replicate 25) randomChar
+    (sequenceA . replicate size) randomChar
