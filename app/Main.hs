@@ -36,12 +36,12 @@ main :: IO ()
 main = do
     sync <- newTVarIO def
     let runActionToIO m = runReaderT (runWebM m) sync
-    scottyT 3000 runActionToIO api
+    scottyT 3000 runActionToIO (web >> api)
 
 api :: ScottyT Text WebM ()
 api = do
     middleware logStdoutDev
-    --middleware $ staticPolicy (noDots >-> isNotAbsolute >-> addBase "static")
+    middleware $ staticPolicy (noDots >-> isNotAbsolute >-> addBase "static" >-> addBase "frontend")
 
     post "/api/runcmd/:cmd" $ do
         cmd <- param "cmd"
@@ -78,6 +78,12 @@ api = do
             Left e -> do
                 status status503
                 text $ "error: " <> pack (show e)
+
+web :: ScottyT Text WebM ()
+web = do
+    get "/" $ do
+        htmlDoc <- liftIO $ readFile "frontend/main.html"
+        html (pack htmlDoc)
 
 randomString :: Int -> IO String
 randomString size =

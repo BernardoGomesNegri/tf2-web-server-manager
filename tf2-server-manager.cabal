@@ -12,14 +12,20 @@ version:            1.0.0.0
 -- bug-reports:
 
 -- The license under which the package is released.
--- license:
-author:             Bernardo Gomes Negri
-maintainer:         38192358+BernardoGomesNegri@users.noreply.github.com
+license: MIT
+author: Bernardo Gomes Negri
+maintainer: 8192358+BernardoGomesNegri@users.noreply.github.com
 
 -- A copyright notice.
 -- copyright:
 -- category:
 extra-source-files: CHANGELOG.md
+
+Flag debug {
+    Description: faster compilation
+    Manual: True
+    Default: True
+    }
 
 executable tf2-server-manager
     main-is:          Main.hs
@@ -28,6 +34,10 @@ executable tf2-server-manager
     other-modules: Rcon
     other-modules: LeEncoding
 
+    if flag(debug)
+        ghc-options: -O0
+    else
+        ghc-options: -O2 -threaded -with-rtsopts="-N"
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
     build-depends: base ^>=4.14.3.0
