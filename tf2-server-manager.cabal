@@ -24,7 +24,7 @@ extra-source-files: CHANGELOG.md
 Flag debug {
     Description: faster compilation
     Manual: True
-    Default: True
+    Default: False
     }
 
 executable tf2-server-manager
@@ -35,9 +35,9 @@ executable tf2-server-manager
     other-modules: LeEncoding
 
     if flag(debug)
-        ghc-options: -O0
+         ghc-options: -O0
     else
-        ghc-options: -O2 -threaded -with-rtsopts="-N"
+         ghc-options: -O2 -threaded -with-rtsopts="-N"
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
     build-depends: base ^>=4.14.3.0

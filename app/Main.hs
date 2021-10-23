@@ -40,9 +40,6 @@ main = do
 
 api :: ScottyT Text WebM ()
 api = do
-    middleware logStdoutDev
-    middleware $ staticPolicy (noDots >-> isNotAbsolute >-> addBase "static" >-> addBase "frontend")
-
     post "/api/runcmd/:cmd" $ do
         cmd <- param "cmd"
         token <- param "token"
@@ -81,6 +78,8 @@ api = do
 
 web :: ScottyT Text WebM ()
 web = do
+    middleware logStdoutDev
+    middleware $ staticPolicy (noDots >-> isNotAbsolute >-> addBase "static" >-> addBase "frontend")
     get "/" $ do
         htmlDoc <- liftIO $ readFile "frontend/main.html"
         html (pack htmlDoc)
