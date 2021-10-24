@@ -33,14 +33,15 @@ executable tf2-server-manager
     -- Modules included in this executable, other than Main.
     other-modules: Rcon
     other-modules: LeEncoding
+    other-modules: TransHelpers
 
     if flag(debug)
          ghc-options: -O0
     else
-         ghc-options: -O2 -threaded -with-rtsopts="-N"
+         ghc-options: -O2 -threaded -with-rtsopts=-N
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
-    build-depends: base ^>=4.14.3.0
+    build-depends: base >=4.14.3.0
     build-depends: scotty
     build-depends: bytestring
     build-depends: network-simple
@@ -55,5 +56,6 @@ executable tf2-server-manager
     build-depends: stm
     build-depends: mtl
     build-depends: text
+    build-depends: transformers
     hs-source-dirs:   app
     default-language: Haskell2010
