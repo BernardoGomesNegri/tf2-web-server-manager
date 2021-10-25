@@ -1,14 +1,14 @@
 {-#LANGUAGE OverloadedStrings, GeneralizedNewtypeDeriving#-}
 module Main where
 import Rcon
-import Network.Wai.Middleware.RequestLogger
 import Network.Wai.Middleware.Static
-import Network.Wai.Parse
 import Network.HTTP.Types.Status(status403, status503, status200)
-import Data.Default.Class
+import Data.Default.Class(Default, def)
 import Control.Concurrent.STM
+    (atomically, TVar, newTVarIO, readTVarIO, modifyTVar')
 import Control.Monad.Reader
-import Data.Functor
+    (MonadIO(..), MonadTrans(..), ReaderT(..), MonadReader(ask))
+import Data.Functor ((<&>))
 import qualified Data.Map.Strict as Map
 import Control.Monad.IO.Class (liftIO)
 import Web.Scotty.Trans
@@ -46,6 +46,9 @@ api = do
         tokenMap <- webM $ gets unstate
         case Map.lookup token tokenMap of
             Just conn -> do
+#ifdef DEBUG
+                print "running command: " ++ cmd ++ " with token " ++ token
+#endif
                 result <- liftIO $ sendCmd cmd conn
                 case result of
                     Just r -> do
@@ -78,7 +81,9 @@ api = do
 
 web :: ScottyT Text WebM ()
 web = do
+#ifdef DEBUG
     middleware logStdoutDev
+#endif
     middleware $ staticPolicy (noDots >-> isNotAbsolute >-> addBase "static" >-> addBase "frontend")
     get "/" $ do
         htmlDoc <- liftIO $ readFile "frontend/main.html"

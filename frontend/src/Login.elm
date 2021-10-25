@@ -1,12 +1,13 @@
-module Main exposing (..)
+module Login exposing (..)
 import Browser
-import Html exposing (div, input, text)
-import Html.Events exposing (onInput)
+import Http exposing (Response(..))
+import Html exposing (..)
+import Html.Events exposing (..)
 import Browser.Navigation as Navigation
 import Url
 import Url.Builder as UrlBuilder
-import Http exposing (Response(..))
 import Maybe as Maybe
+import Html.Attributes exposing (..)
 
 main : Program () Model Msg
 main =
@@ -114,6 +115,25 @@ view : Model -> Browser.Document Msg
 view model =
     {title = "Login to your server",
     body = [
-        div [] []
+        div [] [
+            label [for "adress"] [text "Server adress without port number. Can be either IP adress or domain"],
+            input [type_ "text", id "adress", onInput SetAdress] [],
+            label [for "port"] [text "Server port without adress. Just a plain number"],
+            input [type_ "text", id "port", onInput SetPort] [],
+            label [for "password"] [text "Server RCON password, set using the cvar \"rcon_password\""],
+            input [type_ "text", id "password", onInput SetPassword] [],
+            button [onClick Login] [text "Login"],
+            div [] [text (case model.error of
+                Just e ->
+                    case e of
+                        NoApi ->
+                            "It was not possible to connect to the webserver. Make sure it is running."
+                        NoServer ->
+                            "It was not possible to connect to the server. Make sure the adress is right and try again."
+                        BadPassword ->
+                            """The RCON password you inserted was wrong. The RCON password is stored in the server's 'rcon_password' cvar, 
+                            make sure it is not empty"""
+                Nothing -> "")]
+        ]
     ]}
     

@@ -36,11 +36,13 @@ executable tf2-server-manager
     other-modules: TransHelpers
 
     if flag(debug)
-         ghc-options: -O0
+         ghc-options: -O0 -cpp -pgmP cpphs
+         cpp-options: --cpp -DDEBUG
     else
-         ghc-options: -O2 -threaded -with-rtsopts=-N
+         ghc-options: -O2 -threaded -with-rtsopts=-N -cpp -pgmP cpphs
+         cpp-options: --cpp
     -- LANGUAGE extensions used by modules in this package.
-    -- other-extensions:
+    other-extensions: CPP
     build-depends: base >=4.14.3.0
     build-depends: scotty
     build-depends: bytestring
