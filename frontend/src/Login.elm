@@ -25,7 +25,7 @@ onUrlChange = ChangeUrl
 
 type alias Token = String
 
-type AppError = NoApi | NoServer | BadPassword
+type AppError = NoApi | NoServer | BadPassword | BadPort
 
 type alias Model = {
     key : Navigation.Key,
@@ -56,11 +56,11 @@ update msg model =
             case String.toInt prt of
                 Just s ->
                     if s < 99999 && s > 0 then
-                        ({model | portNum = Just s}, Cmd.none)
+                        ({model | portNum = Just s, error = Nothing}, Cmd.none)
                     else
-                        (model, Cmd.none)
+                        ({model | error = Just BadPort}, Cmd.none)
                 Nothing ->
-                    (model, Cmd.none)
+                    ({model | error = Just BadPort}, Cmd.none)
         SetAdress adr ->
             ({model | adress = Just adr}, Cmd.none)
         SetPassword pwd ->
@@ -116,13 +116,13 @@ view model =
     {title = "Login to your server",
     body = [
         div [] [
-            label [for "adress"] [text "Server adress without port number. Can be either IP adress or domain"],
-            input [type_ "text", id "adress", onInput SetAdress] [],
-            label [for "port"] [text "Server port without adress. Just a plain number"],
-            input [type_ "text", id "port", onInput SetPort] [],
-            label [for "password"] [text "Server RCON password, set using the cvar \"rcon_password\""],
-            input [type_ "text", id "password", onInput SetPassword] [],
-            button [onClick Login] [text "Login"],
+            label [for "adress"] [text "Server adress without port number. Can be either IP adress or domain"], newLine,
+            input [type_ "text", id "adress", onInput SetAdress] [], newLine,
+            label [for "port"] [text "Server port without adress. Just a plain number"], newLine,
+            input [type_ "number", id "port", Html.Attributes.max "99999", Html.Attributes.min "0", onInput SetPort, placeholder "Port number, usually 27015"] [], newLine,
+            label [for "password"] [text "Server RCON password, set using the cvar \"rcon_password\""], newLine,
+            input [type_ "text", id "password", onInput SetPassword] [], newLine,
+            button [onClick Login] [text "Login"], text "It may take a while for the server to respond, please be patient", newLine,
             div [] [text (case model.error of
                 Just e ->
                     case e of
@@ -133,7 +133,10 @@ view model =
                         BadPassword ->
                             """The RCON password you inserted was wrong. The RCON password is stored in the server's 'rcon_password' cvar, 
                             make sure it is not empty"""
+                        BadPort ->
+                            "Make sure the port you entered is a valid number between 0 and 99999"
                 Nothing -> "")]
         ]
     ]}
-    
+
+newLine = br [] [text ""]

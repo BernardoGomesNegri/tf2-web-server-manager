@@ -1,6 +1,7 @@
 {-#LANGUAGE OverloadedStrings, GeneralizedNewtypeDeriving#-}
 module Main where
 import Rcon
+import Network.Wai.Middleware.RequestLogger(logStdoutDev)
 import Network.Wai.Middleware.Static
 import Network.HTTP.Types.Status(status403, status503, status200)
 import Data.Default.Class(Default, def)
@@ -40,6 +41,14 @@ main = do
 
 api :: ScottyT Text WebM ()
 api = do
+    get "/api/validate/:token" $ do
+        token <- param "token"
+        tokenMap <- webM $ gets unstate
+        case Map.lookup token tokenMap of
+            Just _ -> text "1"
+            _ -> text "0"
+
+
     post "/api/runcmd/:cmd" $ do
         cmd <- param "cmd"
         token <- param "token"
@@ -47,7 +56,7 @@ api = do
         case Map.lookup token tokenMap of
             Just conn -> do
 #ifdef DEBUG
-                print "running command: " ++ cmd ++ " with token " ++ token
+                liftIO $ print $ "running command: " ++ cmd ++ " with token " ++ token
 #endif
                 result <- liftIO $ sendCmd cmd conn
                 case result of
@@ -84,10 +93,14 @@ web = do
 #ifdef DEBUG
     middleware logStdoutDev
 #endif
-    middleware $ staticPolicy (noDots >-> isNotAbsolute >-> addBase "static" >-> addBase "frontend")
-    get "/" $ do
-        htmlDoc <- liftIO $ readFile "frontend/main.html"
-        html (pack htmlDoc)
+    middleware $ staticPolicy (noDots >-> isNotAbsolute >-> addBase "static")
+    get "/server" (serveFile "frontend/server.html")
+    get "/" (serveFile "frontend/login.html")
+
+serveFile :: FilePath -> ActionT Text WebM ()
+serveFile f = do
+    htmlDoc <- liftIO $ readFile f
+    html (pack htmlDoc)
 
 randomString :: Int -> IO String
 randomString size =
