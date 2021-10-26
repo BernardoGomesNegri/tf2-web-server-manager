@@ -42,22 +42,23 @@ main = do
 api :: ScottyT Text WebM ()
 api = do
     get "/api/validate/:token" $ do
+#ifdef DEBUG
+        text "1"
+#else
         token <- param "token"
         tokenMap <- webM $ gets unstate
         case Map.lookup token tokenMap of
             Just _ -> text "1"
             _ -> text "0"
-
-
+#endif
+    
     post "/api/runcmd/:cmd" $ do
         cmd <- param "cmd"
         token <- param "token"
         tokenMap <- webM $ gets unstate
         case Map.lookup token tokenMap of
             Just conn -> do
-#ifdef DEBUG
                 liftIO $ print $ "running command: " ++ cmd ++ " with token " ++ token
-#endif
                 result <- liftIO $ sendCmd cmd conn
                 case result of
                     Just r -> do

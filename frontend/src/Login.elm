@@ -110,7 +110,9 @@ newReq {portNum, adress, password} =
     Maybe.andThen (\prt -> Maybe.andThen (\adr -> Maybe.andThen (\pwd ->
         Just (UrlBuilder.absolute ["api","gettoken"] [UrlBuilder.int "port" prt, UrlBuilder.string "password" pwd,
         UrlBuilder.string "adress" adr])) password) adress) portNum
-    
+
+newLine = br [] [text ""]
+
 view : Model -> Browser.Document Msg
 view model =
     {title = "Login to your server",
@@ -138,5 +140,3 @@ view model =
                 Nothing -> "")]
         ]
     ]}
-
-newLine = br [] [text ""]
