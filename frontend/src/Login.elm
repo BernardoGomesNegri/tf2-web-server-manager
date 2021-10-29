@@ -82,7 +82,7 @@ update msg model =
                     (model, Navigation.load e)
         ChangeUrl _ -> (model, Cmd.none)
         GotToken t ->
-            (model, Navigation.load (UrlBuilder.absolute ["server", ""] [UrlBuilder.string "token" t]))
+            (model, Navigation.load (UrlBuilder.absolute ["server"] [UrlBuilder.string "token" t]))
         TokenError err ->
             ({model | error = (Just err)}, Cmd.none)
 

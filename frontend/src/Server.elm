@@ -121,4 +121,25 @@ grabParam : Url.Url -> String -> Maybe String
 grabParam url str =
     case url.query of
         Just q ->
-            (String.split "&" q)
+            grabWhile (\s -> let split = String.split "=" s in
+                case (index split 0, index split 1) of
+                    (Just n, _) -> n == str
+                    _ -> False) (String.split "&" q)
+        Nothing -> Nothing
+
+grabWhile : (a -> Bool) -> List a -> Maybe a
+grabWhile p l =
+    case (List.head l, List.tail l) of
+        (Just h, Just t) -> if p h then Just h else grabWhile p t
+        (Nothing, _) -> Nothing
+        (Just h, Nothing) -> if p h then Just h else Nothing
+
+index : List a -> Int -> Maybe a
+index l i =
+    snd (List.foldl (\e a -> case a of
+        (_, Just _) -> a
+        (ind, Nothing) -> if ind == i then (ind + 1, Just e) else (ind + 1, Nothing)) (0, Nothing) l)
+
+
+snd t = case t of
+    (_,s) -> s
