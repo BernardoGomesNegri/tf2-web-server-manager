@@ -28,7 +28,7 @@ main =
 
 type alias Token = String
 
-type AppError = None | NoCmd
+type AppError = None | NoCmd | TokenWrongErr
 
 type alias Model = {
     key : Browser.Navigation.Key,
@@ -48,7 +48,7 @@ init _ url k =
         Just t ->
             (Model k (Just t) "" "" False None, Http.get ({url = UrlBuilder.absolute ["api", "validate", t] [], expect = expectString parseToken}))
         Nothing ->
-            (Model k Nothing "" "" False None, Cmd.map (\_ -> TokenWrong) Cmd.none)
+            (Model k Nothing "" "" False None, Cmd.map (\_ -> TokenWrong) (Navigation.load (UrlBuilder.absolute [""] [])))
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
@@ -58,10 +58,10 @@ update msg model =
                 Just t ->
                     ({model | waiting = True}, Http.post ({url = UrlBuilder.absolute ["api", "runcmd", model.command] [UrlBuilder.string "token" t], body = Http.emptyBody,
                         expect = expectString parseCmdResponse}))
-                Nothing -> wrapModel {model | error = NoCmd}
+                Nothing -> wrapModel {model | error = TokenWrongErr}
         SetCmd s -> wrapModel {model | command = s}
         TokenRight -> (model, Cmd.none)
-        TokenWrong -> (model, Browser.Navigation.load (UrlBuilder.absolute ["/"] []))
+        TokenWrong -> wrapModel {model | error = TokenWrongErr}
         ChangePage req -> (model, (Browser.Navigation.load (reqToString req)))
         ChangeUrl u -> (model, (Browser.Navigation.pushUrl model.key (Url.toString u)))
         CmdGood str -> wrapModel {model | commandResponse = str}
@@ -101,8 +101,9 @@ view : Model -> Browser.Document Msg
 view model =
     {title = "TF2 server manager",
     body = [
-        label [for "cmdinput"] [text "Input your command"], 
+        label [for "cmdinput"] [text "Input your command"], nl,
         input [type_ "text", onInput SetCmd, id "cmdinput"] [], nl,
+        button [onClick SendCmd] [text "Send command"],
         text model.commandResponse, nl,
         if model.waiting then
             text "Waiting for server response"
@@ -112,5 +113,12 @@ view model =
         text (case model.error of
             None -> ""
             NoCmd -> "It was not possible to run your command."
+            TokenWrongErr -> "The token was incorrect. Please log in again"
             )
     ]}
+
+grabParam : Url.Url -> String -> Maybe String
+grabParam url str =
+    case url.query of
+        Just q ->
+            (String.split "&" q)
