@@ -4,3 +4,7 @@ Remove-Item ".\out\build" -Recurse
 Remove-Item ".\out\cache" -Recurse
 Remove-Item ".\out\packagedb" -Recurse
 Remove-Item ".\out\tmp" -Recurse
+cd frontend
+elm make src/Login.elm --output=..\out\frontend\login.html
+elm make src/Server.elm --output=..\out\frontend\server.html
+cd ..
