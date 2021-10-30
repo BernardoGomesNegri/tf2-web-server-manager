@@ -64,8 +64,8 @@ update msg model =
         TokenWrong -> wrapModel {model | error = TokenWrongErr}
         ChangePage req -> (model, (Browser.Navigation.load (reqToString req)))
         ChangeUrl u -> (model, (Browser.Navigation.pushUrl model.key (Url.toString u)))
-        CmdGood str -> wrapModel {model | commandResponse = str}
-        CmdBad -> wrapModel {model | error = NoCmd}
+        CmdGood str -> wrapModel {model | commandResponse = str, waiting = False}
+        CmdBad -> wrapModel {model | error = NoCmd, waiting = False}
 
 
 parseCmdResponse : Result Http.Error String -> Msg
@@ -80,7 +80,7 @@ parseToken res =
     case res of
         Err _ -> TokenWrong
         Ok s ->
-            if s == "1" then TokenRight else TokenRight
+            if s == "1" then TokenRight else TokenWrong
 
 reqToString req =
     case req of
@@ -102,8 +102,8 @@ view model =
     body = [
         label [for "cmdinput"] [text "Input your command"], nl,
         input [type_ "text", onInput SetCmd, id "cmdinput"] [], nl,
-        button [onClick SendCmd] [text "Send command"],
-        text model.commandResponse, nl,
+        button [onClick SendCmd] [text "Send command"],nl] ++
+        List.concatMap (\s -> [text s, nl]) (String.split "\n" model.commandResponse) ++ [nl,
         if model.waiting then
             text "Waiting for server response"
         else

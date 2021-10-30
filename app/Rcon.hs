@@ -33,14 +33,19 @@ data Packet = Packet {
 
 data ConnErr = BadPassword | UnexpectedResponse | ConnError String deriving Show
 
+errHandler :: SomeException -> IO (Either ConnErr Connection)
+errHandler e = return $ Left $ ConnError (show e)
+
 withConn :: Connection -> (Socket -> IO a) -> MaybeT IO a
 withConn conn@Connection {adress = adress, port = port, password = pwd} action = do
-    MaybeT $ connect adress (show port) $ \(socket,_) -> do
-        authenticated <- authenticateConn conn socket
-        if authenticated then do
-            result <- action socket
-            return $ return result
-        else return Nothing
+    MaybeT $
+        handle errHandler $
+            connect adress (show port) $ \(socket,_) -> do
+                authenticated <- authenticateConn conn socket
+                if authenticated then do
+                    result <- action socket
+                    return $ return result
+                else return Nothing
 
 
 requestToInt :: RequestType -> Int32
@@ -71,9 +76,6 @@ newConn port adress pwd =
             if authenticated then
                 return $ return (Connection port adress pwd)
             else return $ Left BadPassword
-    where
-        errHandler :: SomeException -> IO (Either ConnErr Connection)
-        errHandler e = return $ Left $ ConnError (show e)
 
 authenticateConn :: Connection -> Socket -> IO Bool
 authenticateConn Connection { port = port, adress = adress, password = pwd} socket = do
