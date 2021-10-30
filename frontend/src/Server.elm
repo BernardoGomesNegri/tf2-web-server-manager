@@ -95,7 +95,6 @@ subscriptions : Model -> Sub Msg
 subscriptions _ =
     Sub.none
 
-nl = br [] []
 
 view : Model -> Browser.Document Msg
 view model =
@@ -143,3 +142,7 @@ index l i =
 
 snd t = case t of
     (_,s) -> s
+
+
+nl : Html msg
+nl = br [] []
