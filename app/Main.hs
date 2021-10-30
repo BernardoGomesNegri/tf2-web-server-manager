@@ -16,7 +16,8 @@ import Web.Scotty.Trans
 import System.Random(randomIO, randoms, getStdRandom, randomR)
 import Data.Text.Lazy(Text, pack, append)
 
-newtype State = State {unstate :: Map.Map String Connection}
+type Token = String
+newtype State = State {unstate :: Map.Map Token Connection}
 
 instance Default State where
     def = State Map.empty
@@ -54,22 +55,16 @@ api = do
     
     post "/api/runcmd/:cmd" $ do
         cmd <- param "cmd"
-        token <- param "token"
-        tokenMap <- webM $ gets unstate
-        case Map.lookup token tokenMap of
-            Just conn -> do
-                liftIO $ print $ "running command: " ++ cmd ++ " with token " ++ token
-                result <- liftIO $ sendCmd cmd conn
-                case result of
-                    Just r -> do
-                        status status200
-                        text (pack r)
-                    Nothing -> do
-                        status status503
-                        text "error"
-            Nothing -> do
-                status status403
-                text "invalidtoken"
+        withToken (\token conn -> do
+            liftIO $ print $ "running command: " ++ cmd ++ " with token " ++ token
+            result <- liftIO $ sendCmd cmd conn
+            case result of
+                Just r -> do
+                    status status200
+                    text (pack r)
+                Nothing -> do
+                    status status503
+                    text "error")
 
     get "/api/gettoken" $ do
         port <- param "port"
@@ -89,6 +84,14 @@ api = do
                 status status503
                 text $ "error: " <> pack (show e)
 
+withToken :: (Token -> Connection -> ActionT Text WebM ()) -> ActionT Text WebM ()
+withToken f = do
+    token <- param "token"
+    tokenMap <- webM $ gets unstate
+    case Map.lookup token tokenMap of
+        Just conn -> f token conn
+        Nothing -> status status403 >> text "invalid token"
+
 web :: ScottyT Text WebM ()
 web = do
 #ifdef DEBUG
@@ -103,7 +106,7 @@ serveFile f = do
     htmlDoc <- liftIO $ readFile f
     html (pack htmlDoc)
 
-randomString :: Int -> IO String
+randomString :: Int -> IO Token
 randomString size =
     let all = ['0'..'9'] ++ ['a'..'z'] ++ ['A'..'Z'] in
     let randomChar = (!!) all <$> getStdRandom (randomR (0, 61)) in
