@@ -43,7 +43,7 @@ type Msg = SendCmd | SetCmd String | TokenRight | TokenWrong | ChangePage Browse
 
 init : () -> Url.Url -> Navigation.Key -> (Model, Cmd Msg)
 init _ url k =
-    let token = Maybe.andThen (\x -> x) (Url.Parser.parse (Url.Parser.query (Url.Parser.Query.string "token")) url) in
+    let token = grabParam url "token" in
     case token of
         Just t ->
             (Model k (Just t) "" "" False None, Http.get ({url = UrlBuilder.absolute ["api", "validate", t] [], expect = expectString parseToken}))
@@ -120,10 +120,10 @@ grabParam : Url.Url -> String -> Maybe String
 grabParam url str =
     case url.query of
         Just q ->
-            grabWhile (\s -> let split = String.split "=" s in
-                case (index split 0, index split 1) of
+            let chosen = grabWhile (\s -> case (index 0 (String.split "=" s), index 1 (String.split "=" s)) of
                     (Just n, _) -> n == str
-                    _ -> False) (String.split "&" q)
+                    _ -> False) (String.split "&" q) in
+            Maybe.andThen (\s -> index 1 (String.split "=" s)) chosen
         Nothing -> Nothing
 
 grabWhile : (a -> Bool) -> List a -> Maybe a
@@ -133,8 +133,8 @@ grabWhile p l =
         (Nothing, _) -> Nothing
         (Just h, Nothing) -> if p h then Just h else Nothing
 
-index : List a -> Int -> Maybe a
-index l i =
+index : Int -> List a -> Maybe a
+index i l =
     snd (List.foldl (\e a -> case a of
         (_, Just _) -> a
         (ind, Nothing) -> if ind == i then (ind + 1, Just e) else (ind + 1, Nothing)) (0, Nothing) l)
