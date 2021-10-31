@@ -109,5 +109,5 @@ serveFile f = do
 randomString :: Int -> IO Token
 randomString size =
     let all = ['0'..'9'] ++ ['a'..'z'] ++ ['A'..'Z'] in
-    let randomChar = (!!) all <$> getStdRandom (randomR (0, 61)) in
+    let randomChar = (!!) all <$> getStdRandom (randomR (0, length all - 1)) in
     (sequenceA . replicate size) randomChar

@@ -14,6 +14,10 @@ import System.Random(randomIO)
 import TransHelpers
 import Control.Monad (join)
 
+
+individualWait = 100000
+numberWait = 6
+
 type Port = Int
 
 data RequestType = Auth | Command | AuthResponse | CommandResponse deriving Show
@@ -36,10 +40,13 @@ data ConnErr = BadPassword | UnexpectedResponse | ConnError String deriving Show
 errHandler :: SomeException -> IO (Either ConnErr Connection)
 errHandler e = return $ Left $ ConnError (show e)
 
+errHandlerMaybe :: SomeException -> IO (Maybe a)
+errHandlerMaybe _ = return Nothing
+
 withConn :: Connection -> (Socket -> IO a) -> MaybeT IO a
 withConn conn@Connection {adress = adress, port = port, password = pwd} action = do
     MaybeT $
-        handle errHandler $
+        handle errHandlerMaybe $
             connect adress (show port) $ \(socket,_) -> do
                 authenticated <- authenticateConn conn socket
                 if authenticated then do
@@ -100,10 +107,10 @@ getAndWait socket s = MaybeT $ go 0 B.empty s where
         case stuff of
             Just x -> do
                 let newTotal = B.concat [total,x]
-                if B.length x < size && count < 6 then threadDelay 100000 >> go (count + 1) newTotal size else
+                if B.length x < size && count < numberWait then threadDelay individualWait >> go (count + 1) newTotal size else
                     return $ return newTotal
             Nothing ->
-                if count < 6 then threadDelay 100000 >> go (count + 1) total size else return Nothing
+                if count < numberWait then threadDelay individualWait >> go (count + 1) total size else return Nothing
 
 getServerPacket :: Socket -> Maybe Int32 -> MaybeT IO Packet
 getServerPacket socket idM = do
