@@ -15,6 +15,8 @@ import Control.Monad.IO.Class (liftIO)
 import Web.Scotty.Trans
 import System.Random(randomIO, randoms, getStdRandom, randomR)
 import Data.Text.Lazy(Text, pack, append)
+import Text.Read (readMaybe)
+import System.Environment (getArgs)
 
 type Token = String
 newtype State = State {unstate :: Map.Map Token Connection}
@@ -38,7 +40,14 @@ main :: IO ()
 main = do
     sync <- newTVarIO def
     let runActionToIO m = runReaderT (runWebM m) sync
-    scottyT 3000 runActionToIO (web >> api)
+    args <- getArgs
+    let port = safeHead args >>= readMaybe :: Maybe Int
+    case port of
+        Just p -> scottyT p runActionToIO (web >> api)
+        Nothing -> scottyT 3000 runActionToIO (web >> api)
+    
+safeHead [] = Nothing
+safeHead (x:_) = Just x
 
 api :: ScottyT Text WebM ()
 api = do
@@ -94,9 +103,7 @@ withToken f = do
 
 web :: ScottyT Text WebM ()
 web = do
-#ifdef DEBUG
     middleware logStdoutDev
-#endif
     middleware $ staticPolicy (noDots >-> isNotAbsolute >-> addBase "static")
     get "/server" (serveFile "frontend/server.html")
     get "/" (serveFile "frontend/login.html")
