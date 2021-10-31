@@ -1,7 +1,7 @@
 module Rcon where
 import Network.Simple.TCP
-import Data.ByteString as B
-import Data.ByteString.Lazy as BL
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.UTF8 as UTF8
 import Data.Int as Int
 import Data.Binary
@@ -15,8 +15,8 @@ import TransHelpers
 import Control.Monad (join)
 
 
-individualWait = 100000
-numberWait = 6
+individualWait = 10000
+numberWait = 50
 
 type Port = Int
 
@@ -100,17 +100,17 @@ authenticateConn Connection { port = port, adress = adress, password = pwd} sock
         Nothing -> return False
 
 getAndWait :: Socket -> Int -> MaybeT IO B.ByteString
-getAndWait socket s = MaybeT $ go 0 B.empty s where
-    go :: Int -> B.ByteString -> Int -> IO (Maybe B.ByteString)
-    go count total size = do
+getAndWait socket size = MaybeT $ go 0 B.empty where
+    go :: Int -> B.ByteString -> IO (Maybe B.ByteString)
+    go count total = do
         stuff <- recv socket size
         case stuff of
             Just x -> do
                 let newTotal = B.concat [total,x]
-                if B.length x < size && count < numberWait then threadDelay individualWait >> go (count + 1) newTotal size else
+                if B.length x < size && count < numberWait then threadDelay individualWait >> go (count + 1) newTotal else
                     return $ return newTotal
             Nothing ->
-                if count < numberWait then threadDelay individualWait >> go (count + 1) total size else return Nothing
+                if count < numberWait then threadDelay individualWait >> go (count + 1) total else return Nothing
 
 getServerPacket :: Socket -> Maybe Int32 -> MaybeT IO Packet
 getServerPacket socket idM = do
@@ -146,7 +146,10 @@ createPackage command idInt reqType =
         null = UTF8.fromString "\0\0"
 
 sendCmd :: String -> Connection -> IO (Maybe String)
-sendCmd s c = runMaybeT $ sendCmdInternal s c
+sendCmd s c = runMaybeT $ unlines . safeInit . lines <$> sendCmdInternal s c
+
+safeInit [] = []
+safeInit xs = init xs
 
 sendCmdInternal :: String -> Connection -> MaybeT IO String
 sendCmdInternal body conn =

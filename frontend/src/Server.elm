@@ -64,7 +64,7 @@ update msg model =
         TokenWrong -> wrapModel {model | error = TokenWrongErr}
         ChangePage req -> (model, (Browser.Navigation.load (reqToString req)))
         ChangeUrl u -> (model, (Browser.Navigation.pushUrl model.key (Url.toString u)))
-        CmdGood str -> wrapModel {model | commandResponse = str, waiting = False}
+        CmdGood str -> wrapModel {model | commandResponse = str, waiting = False, error = None}
         CmdBad -> wrapModel {model | error = NoCmd, waiting = False}
 
 
@@ -111,7 +111,7 @@ view model =
         ,nl,
         text (case model.error of
             None -> ""
-            NoCmd -> "It was not possible to run your command."
+            NoCmd -> "The server took a while to respond. The command may not have ran."
             TokenWrongErr -> "The token was incorrect. Please log in again"
             )
     ]}
