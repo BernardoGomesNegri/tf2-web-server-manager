@@ -1,8 +1,9 @@
-{-#LANGUAGE OverloadedStrings, GeneralizedNewtypeDeriving#-}
+{-#LANGUAGE OverloadedStrings, GeneralizedNewtypeDeriving, DeriveGeneric#-}
 module Main where
 import Rcon
 import Network.Wai.Middleware.RequestLogger(logStdoutDev)
-import Network.Wai.Middleware.Static
+import Network.Wai.Middleware.Static hiding ((<|>))
+import Text.Parsec hiding (State)
 import Network.HTTP.Types.Status(status403, status503, status200)
 import Data.Default.Class(Default, def)
 import Control.Concurrent.STM
@@ -17,6 +18,8 @@ import System.Random(randomIO, randoms, getStdRandom, randomR)
 import Data.Text.Lazy(Text, pack, append)
 import Text.Read (readMaybe)
 import System.Environment (getArgs)
+import GHC.Generics (Generic)
+import Data.Aeson (ToJSON)
 
 type Token = String
 newtype State = State {unstate :: Map.Map Token Connection}
@@ -26,6 +29,21 @@ instance Default State where
 
 newtype WebM a = WebM { runWebM :: ReaderT (TVar State) IO a }
     deriving (Applicative, Functor, Monad, MonadIO, MonadReader (TVar State))
+
+type Seconds = Int
+
+data Player = Player {
+    userid :: Int,
+    name :: String,
+    steamid :: String,
+    time :: Seconds,
+    ping :: Int,
+    loss :: Int,
+    connectionStatus :: String,
+    playerAdress :: String
+} deriving (Generic, Show)
+
+instance ToJSON Player where
 
 webM :: MonadTrans t => WebM a -> t WebM a
 webM = lift
@@ -45,23 +63,19 @@ main = do
     case port of
         Just p -> scottyT p runActionToIO (web >> api)
         Nothing -> scottyT 3000 runActionToIO (web >> api)
-    
+
 safeHead [] = Nothing
 safeHead (x:_) = Just x
 
 api :: ScottyT Text WebM ()
 api = do
     get "/api/validate/:token" $ do
-#ifdef DEBUG
-        text "1"
-#else
         token <- param "token"
         tokenMap <- webM $ gets unstate
         case Map.lookup token tokenMap of
             Just _ -> text "1"
             _ -> text "0"
-#endif
-    
+
     post "/api/runcmd/:cmd" $ do
         cmd <- param "cmd"
         withToken (\token conn -> do
@@ -92,6 +106,80 @@ api = do
             Left e -> do
                 status status503
                 text $ "error: " <> pack (show e)
+
+    get "/api/getplayers" $ do
+        withToken $ \token conn -> do
+            result <- liftIO $ sendCmd "status" conn
+            case result of
+                Just r -> do
+                    let players = lines . drop 10 $ r
+                    let playerList = traverse (parse parsePlayer "") players
+                    case playerList of
+                        Right l -> json l
+                        Left _ -> status status503 >> text "error"
+                Nothing -> status status503 >> text "error"
+
+parseUntilX :: Char -> Parsec String () Char -> Parsec String () String
+parseUntilX c p = go ""
+    where
+    go :: String -> Parsec String () String
+    go s = (do
+        char <- p
+        if char == c then
+            return s
+        else go $ s ++ [char]) <|> return s
+
+parseUntilXconsume c p = go ""
+    where
+    go :: String -> Parsec String () String
+    go s = (do
+        char <- p
+        if char == c then
+            return s
+        else go $ s ++ [char]) <|> (char c >> return s)
+
+parseUntilEof :: Parsec String () String
+parseUntilEof = go ""
+    where
+    go :: String -> Parsec String () String
+    go s =
+        (try eof >> return s) <|> (do
+            ch <- anyChar
+            go (s <> [ch]))
+
+parsePlayer :: Parsec String () Player
+parsePlayer = do
+    let anyNum = do
+            numStr <- parseUntilX ' ' (choice (char <$> ['0'..'9']))
+            case readMaybe numStr of
+                Just n -> return n
+                Nothing -> fail $ "failed to parse number: " <> numStr
+    let anyNumSep sep = do
+            numStr <- parseUntilXconsume sep (choice (char <$> ['0'..'9']))
+            case readMaybe numStr of
+                Just n -> return n
+                Nothing -> fail $ "failed to parse number sep: " <> numStr
+    let white = many (char ' ')
+    char '#'
+    white
+    numId <- anyNum
+    white
+    name <- between (char '\"') (char '\"') (many1 $ noneOf "\"")
+    white
+    steamid <- parseUntilX ' ' anyChar
+    white
+    minutes <- anyNumSep ':' :: Parsec String () Int
+    seconds <- anyNum
+    white
+    let time = (minutes * 60) + seconds
+    ping <- anyNum
+    white
+    loss <- anyNum
+    white
+    connState <- parseUntilX ' ' anyChar
+    white
+    adr <- parseUntilEof
+    return $ Player {name = name, steamid = steamid, ping = ping, loss = loss, connectionStatus = connState, playerAdress = adr, time = time, userid = numId}
 
 withToken :: (Token -> Connection -> ActionT Text WebM ()) -> ActionT Text WebM ()
 withToken f = do

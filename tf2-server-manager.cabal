@@ -42,12 +42,14 @@ executable tf2-server-manager
          ghc-options: -O2 -threaded -with-rtsopts=-N -cpp -pgmP cpphs
          cpp-options: --cpp
     -- LANGUAGE extensions used by modules in this package.
-    other-extensions: CPP
+    other-extensions: CPP, DeriveGeneric
     build-depends: base >=4.14.3.0
     build-depends: scotty
     build-depends: bytestring
+    build-depends: parsec
     build-depends: network-simple
     build-depends: binary
+    build-depends: aeson
     build-depends: utf8-string
     build-depends: random
     build-depends: wai-extra
