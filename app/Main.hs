@@ -112,12 +112,15 @@ api = do
             result <- liftIO $ sendCmd "status" conn
             case result of
                 Just r -> do
-                    let players = lines . drop 10 $ r
+                    let players = drop 10 . lines $ r
                     let playerList = traverse (parse parsePlayer "") players
                     case playerList of
                         Right l -> json l
-                        Left _ -> status status503 >> text "error"
+                        Left e -> status status503 >> text (pack $ show e)
                 Nothing -> status status503 >> text "error"
+    
+    middleware logStdoutDev
+    middleware $ staticPolicy (noDots >-> isNotAbsolute >-> addBase "static")
 
 parseUntilX :: Char -> Parsec String () Char -> Parsec String () String
 parseUntilX c p = go ""
@@ -179,7 +182,8 @@ parsePlayer = do
     connState <- parseUntilX ' ' anyChar
     white
     adr <- parseUntilEof
-    return $ Player {name = name, steamid = steamid, ping = ping, loss = loss, connectionStatus = connState, playerAdress = adr, time = time, userid = numId}
+    return $ Player {name = name, steamid = steamid, ping = ping, loss = loss, connectionStatus = connState,
+        playerAdress = adr, time = time, userid = numId}
 
 withToken :: (Token -> Connection -> ActionT Text WebM ()) -> ActionT Text WebM ()
 withToken f = do
@@ -191,8 +195,6 @@ withToken f = do
 
 web :: ScottyT Text WebM ()
 web = do
-    middleware logStdoutDev
-    middleware $ staticPolicy (noDots >-> isNotAbsolute >-> addBase "static")
     get "/server" (serveFile "frontend/server.html")
     get "/" (serveFile "frontend/login.html")
 
