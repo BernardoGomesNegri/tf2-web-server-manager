@@ -1,7 +1,6 @@
 module Server exposing (..)
 
 import Browser.Navigation
-import Url.Parser.Query
 import Browser
 import Http exposing (Response(..))
 import Html exposing (..)
@@ -11,7 +10,6 @@ import Url
 import Url.Builder as UrlBuilder
 import Maybe as Maybe
 import Html.Attributes exposing (..)
-import Url.Parser
 import Http exposing (expectString)
 import Result exposing (..)
 
