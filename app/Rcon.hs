@@ -1,7 +1,7 @@
 module Rcon where
 import Network.Simple.TCP
-import Data.ByteString as B
-import Data.ByteString.Lazy as BL
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.UTF8 as UTF8
 import Data.Int as Int
 import Data.Binary
@@ -13,6 +13,10 @@ import Control.Concurrent(threadDelay)
 import System.Random(randomIO)
 import TransHelpers
 import Control.Monad (join)
+
+
+individualWait = 10000
+numberWait = 50
 
 type Port = Int
 
@@ -33,14 +37,22 @@ data Packet = Packet {
 
 data ConnErr = BadPassword | UnexpectedResponse | ConnError String deriving Show
 
+errHandler :: SomeException -> IO (Either ConnErr Connection)
+errHandler e = return $ Left $ ConnError (show e)
+
+errHandlerMaybe :: SomeException -> IO (Maybe a)
+errHandlerMaybe _ = return Nothing
+
 withConn :: Connection -> (Socket -> IO a) -> MaybeT IO a
 withConn conn@Connection {adress = adress, port = port, password = pwd} action = do
-    MaybeT $ connect adress (show port) $ \(socket,_) -> do
-        authenticated <- authenticateConn conn socket
-        if authenticated then do
-            result <- action socket
-            return $ return result
-        else return Nothing
+    MaybeT $
+        handle errHandlerMaybe $
+            connect adress (show port) $ \(socket,_) -> do
+                authenticated <- authenticateConn conn socket
+                if authenticated then do
+                    result <- action socket
+                    return $ return result
+                else return Nothing
 
 
 requestToInt :: RequestType -> Int32
@@ -71,9 +83,6 @@ newConn port adress pwd =
             if authenticated then
                 return $ return (Connection port adress pwd)
             else return $ Left BadPassword
-    where
-        errHandler :: SomeException -> IO (Either ConnErr Connection)
-        errHandler e = return $ Left $ ConnError (show e)
 
 authenticateConn :: Connection -> Socket -> IO Bool
 authenticateConn Connection { port = port, adress = adress, password = pwd} socket = do
@@ -91,17 +100,17 @@ authenticateConn Connection { port = port, adress = adress, password = pwd} sock
         Nothing -> return False
 
 getAndWait :: Socket -> Int -> MaybeT IO B.ByteString
-getAndWait socket s = MaybeT $ go 0 B.empty s where
-    go :: Int -> B.ByteString -> Int -> IO (Maybe B.ByteString)
-    go count total size = do
+getAndWait socket size = MaybeT $ go 0 B.empty where
+    go :: Int -> B.ByteString -> IO (Maybe B.ByteString)
+    go count total = do
         stuff <- recv socket size
         case stuff of
             Just x -> do
                 let newTotal = B.concat [total,x]
-                if B.length x < size && count < 6 then threadDelay 100000 >> go (count + 1) newTotal size else
+                if B.length x < size && count < numberWait then threadDelay individualWait >> go (count + 1) newTotal else
                     return $ return newTotal
             Nothing ->
-                if count < 6 then threadDelay 100000 >> go (count + 1) total size else return Nothing
+                if count < numberWait then threadDelay individualWait >> go (count + 1) total else return Nothing
 
 getServerPacket :: Socket -> Maybe Int32 -> MaybeT IO Packet
 getServerPacket socket idM = do
@@ -137,7 +146,10 @@ createPackage command idInt reqType =
         null = UTF8.fromString "\0\0"
 
 sendCmd :: String -> Connection -> IO (Maybe String)
-sendCmd s c = runMaybeT $ sendCmdInternal s c
+sendCmd s c = runMaybeT $ unlines . safeInit . lines <$> sendCmdInternal s c
+
+safeInit [] = []
+safeInit xs = init xs
 
 sendCmdInternal :: String -> Connection -> MaybeT IO String
 sendCmdInternal body conn =

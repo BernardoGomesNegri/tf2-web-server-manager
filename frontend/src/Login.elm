@@ -123,7 +123,7 @@ view model =
             label [for "port"] [text "Server port without adress. Just a plain number"], newLine,
             input [type_ "number", id "port", Html.Attributes.max "99999", Html.Attributes.min "0", onInput SetPort, placeholder "Port number, usually 27015"] [], newLine,
             label [for "password"] [text "Server RCON password, set using the cvar \"rcon_password\""], newLine,
-            input [type_ "text", id "password", onInput SetPassword] [], newLine,
+            input [type_ "password", id "password", onInput SetPassword] [], newLine,
             button [onClick Login] [text "Login"], text "It may take a while for the server to respond, please be patient", newLine,
             div [] [text (case model.error of
                 Just e ->

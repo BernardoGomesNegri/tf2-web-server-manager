@@ -12,6 +12,8 @@ import Maybe as Maybe
 import Html.Attributes exposing (..)
 import Http exposing (expectString)
 import Result exposing (..)
+import Time
+import Json.Decode exposing (Decoder, field, string, int, map8, list)
 
 main : Program () Model Msg
 main =
@@ -26,6 +28,17 @@ main =
 
 type alias Token = String
 
+type alias Player = {
+    userid : Int,
+    name : String,
+    steamid : String,
+    time : Int,
+    ping : Int,
+    loss : Int,
+    connectionStatus : String,
+    playerAdress : String
+    }
+
 type AppError = None | NoCmd | TokenWrongErr
 
 type alias Model = {
@@ -34,19 +47,21 @@ type alias Model = {
     command : String,
     commandResponse : String,
     waiting : Bool,
-    error : AppError
+    error : AppError,
+    players : List Player
     }
 
 type Msg = SendCmd | SetCmd String | TokenRight | TokenWrong | ChangePage Browser.UrlRequest | ChangeUrl Url.Url | CmdGood String | CmdBad
+    | UpdatePlayers | GotPlayers (List Player)
 
 init : () -> Url.Url -> Navigation.Key -> (Model, Cmd Msg)
 init _ url k =
     let token = grabParam url "token" in
     case token of
         Just t ->
-            (Model k (Just t) "" "" False None, Http.get ({url = UrlBuilder.absolute ["api", "validate", t] [], expect = expectString parseToken}))
+            (Model k (Just t) "" "" False None [], Http.get ({url = UrlBuilder.absolute ["api", "validate", t] [], expect = expectString parseToken}))
         Nothing ->
-            (Model k Nothing "" "" False None, Cmd.map (\_ -> TokenWrong) (Navigation.load (UrlBuilder.absolute [""] [])))
+            (Model k Nothing "" "" False None [], Cmd.map (\_ -> TokenWrong) (Navigation.load (UrlBuilder.absolute [""] [])))
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
@@ -62,23 +77,36 @@ update msg model =
         TokenWrong -> wrapModel {model | error = TokenWrongErr}
         ChangePage req -> (model, (Browser.Navigation.load (reqToString req)))
         ChangeUrl u -> (model, (Browser.Navigation.pushUrl model.key (Url.toString u)))
-        CmdGood str -> wrapModel {model | commandResponse = str}
-        CmdBad -> wrapModel {model | error = NoCmd}
+        CmdGood str -> wrapModel {model | commandResponse = str, waiting = False, error = None}
+        CmdBad -> wrapModel {model | error = NoCmd, waiting = False}
+        GotPlayers plL -> wrapModel {model | players = plL}
+        UpdatePlayers ->
+            case model.token of
+                Just t ->
+                    (model, Http.get {url = UrlBuilder.absolute ["api", "getplayers"] [UrlBuilder.string "token" t],
+                        expect = Http.expectJson (parseAnyResponse GotPlayers) playerDecoder})
+                Nothing -> wrapModel {model | error = TokenWrongErr}
 
+playerDecoder : Decoder (List Player)
+playerDecoder =
+    Json.Decode.list (map8 Player (field "userid" int) (field "name" string) (field "steamid" string) (field "time" int) (field "ping" int) (field "loss" int)
+        (field "connectionStatus" string) (field "playerAdress" string))
 
 parseCmdResponse : Result Http.Error String -> Msg
-parseCmdResponse res =
-    case res of
-        Ok r -> CmdGood r
-        Err _ -> CmdBad
+parseCmdResponse = parseAnyResponse CmdGood
 
+parseAnyResponse : (a -> Msg) -> Result Http.Error a -> Msg
+parseAnyResponse f res =
+    case res of
+        Ok r -> f r
+        Err _ -> CmdBad
 
 parseToken : Result Http.Error String -> Msg
 parseToken res =
     case res of
         Err _ -> TokenWrong
         Ok s ->
-            if s == "1" then TokenRight else TokenRight
+            if s == "1" then TokenRight else TokenWrong
 
 reqToString req =
     case req of
@@ -91,7 +119,7 @@ onUrlChange = ChangeUrl
 
 subscriptions : Model -> Sub Msg
 subscriptions _ =
-    Sub.none
+    Time.every 1000 (\_ -> UpdatePlayers)
 
 
 view : Model -> Browser.Document Msg
@@ -100,8 +128,28 @@ view model =
     body = [
         label [for "cmdinput"] [text "Input your command"], nl,
         input [type_ "text", onInput SetCmd, id "cmdinput"] [], nl,
-        button [onClick SendCmd] [text "Send command"],
-        text model.commandResponse, nl,
+        button [onClick SendCmd] [text "Send command"],nl,
+        table [] [
+            thead [] [
+                tr [] [
+                    th [] [text "Players on the server"]
+                ],
+                tr [] [
+                    th [] [text "Name"],
+                    th [] [text "User Id"],
+                    th [] [text "Steam Id"],
+                    th [] [text "Connected for X seconds"],
+                    th [] [text "Ping (in milliseconds)"],
+                    th [] [text "Loss"],
+                    th [] [text "Connection status"],
+                    th [] [text "IP adress"]
+                ]
+            ],
+            tbody [] (List.map (\p -> tr [] [td [] [text p.name], td [] [text (String.fromInt p.userid)], td [] [text p.steamid],
+                td [] [text (String.fromInt p.time)], td [] [text (String.fromInt p.ping)], td [] [text (String.fromInt p.loss)],
+                td [] [text p.connectionStatus], td [] [text p.playerAdress]]) model.players)
+        ]] ++
+        List.concatMap (\s -> [text s, nl]) (String.split "\n" model.commandResponse) ++ [nl,
         if model.waiting then
             text "Waiting for server response"
         else
@@ -109,7 +157,7 @@ view model =
         ,nl,
         text (case model.error of
             None -> ""
-            NoCmd -> "It was not possible to run your command."
+            NoCmd -> "The server took a while to respond. The command may not have ran."
             TokenWrongErr -> "The token was incorrect. Please log in again"
             )
     ]}
