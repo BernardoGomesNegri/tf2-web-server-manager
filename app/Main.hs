@@ -170,20 +170,26 @@ parsePlayer = do
     name <- between (char '\"') (char '\"') (many1 $ noneOf "\"")
     white
     steamid <- parseUntilX ' ' anyChar
-    white
-    minutes <- anyNumSep ':' :: Parsec String () Int
-    seconds <- anyNum
-    white
-    let time = (minutes * 60) + seconds
-    ping <- anyNum
-    white
-    loss <- anyNum
-    white
-    connState <- parseUntilX ' ' anyChar
-    white
-    adr <- parseUntilEof
-    return $ Player {name = name, steamid = steamid, ping = ping, loss = loss, connectionStatus = connState,
-        playerAdress = adr, time = time, userid = numId}
+    if steamid /= "BOT" then do
+        white
+        minutes <- anyNumSep ':' :: Parsec String () Int
+        seconds <- anyNum
+        white
+        let time = (minutes * 60) + seconds
+        ping <- anyNum
+        white
+        loss <- anyNum
+        white
+        connState <- parseUntilX ' ' anyChar
+        white
+        adr <- parseUntilEof
+        return $ Player {name = name, steamid = steamid, ping = ping, loss = loss, connectionStatus = connState,
+            playerAdress = adr, time = time, userid = numId}
+    else do
+        white
+        state <- parseUntilEof
+        return $ Player {name = name, steamid = "BOT", ping = 0, loss = 0, connectionStatus = state, playerAdress = "localhost", time = 0,
+            userid = numId}
 
 withToken :: (Token -> Connection -> ActionT Text WebM ()) -> ActionT Text WebM ()
 withToken f = do
