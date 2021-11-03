@@ -1,0 +1,23 @@
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Login to your TF2 server</title>
+  <script src="login.js"></script>
+  <style>
+    body {
+    background-color: white;}
+    input {
+      width: 20 ch;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="myapp"></div>
+  <script>
+  var app = Elm.Login.init({
+    node: document.getElementById('myapp')
+  });
+  </script>
+</body>
+</html>

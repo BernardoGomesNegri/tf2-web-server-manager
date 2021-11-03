@@ -120,7 +120,7 @@ api = do
                 Nothing -> status status503 >> text "error"
     
     middleware logStdoutDev
-    middleware $ staticPolicy (noDots >-> isNotAbsolute >-> addBase "static")
+    middleware $ staticPolicy (noDots >-> isNotAbsolute >-> addBase "frontend")
 
 parseUntilX :: Char -> Parsec String () Char -> Parsec String () String
 parseUntilX c p = go ""
