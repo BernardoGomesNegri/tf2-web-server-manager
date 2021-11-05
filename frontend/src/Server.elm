@@ -123,7 +123,7 @@ onUrlChange = ChangeUrl
 
 subscriptions : Model -> Sub Msg
 subscriptions _ =
-    Sub.batch [Time.every 1000 (\_ -> UpdatePlayers), onKeyPress enterDecoder]
+    Sub.batch [Time.every 2500 (\_ -> UpdatePlayers), onKeyPress enterDecoder]
 
 enterDecoder = Json.Decode.map (\key -> case key of
     "Enter" -> SendCmd
