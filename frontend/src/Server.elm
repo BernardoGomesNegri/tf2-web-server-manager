@@ -49,7 +49,8 @@ type alias Model = {
     commandResponse : String,
     waiting : Bool,
     error : AppError,
-    players : List Player
+    players : List Player,
+    isTickAfterEnter : Bool
     }
 
 type Msg = SendCmd | SetCmd String | TokenRight | TokenWrong | ChangePage Browser.UrlRequest | ChangeUrl Url.Url | CmdGood String | CmdBad
@@ -60,9 +61,9 @@ init _ url k =
     let token = grabParam url "token" in
     case token of
         Just t ->
-            (Model k (Just t) "" "" False NoneErr [], Http.get ({url = UrlBuilder.absolute ["api", "validate", t] [], expect = expectString parseToken}))
+            (Model k (Just t) "" "" False NoneErr [] False, Http.get ({url = UrlBuilder.absolute ["api", "validate", t] [], expect = expectString parseToken}))
         Nothing ->
-            (Model k Nothing "" "" False NoneErr [], Cmd.map (\_ -> TokenWrong) (Navigation.load (UrlBuilder.absolute [""] [])))
+            (Model k Nothing "" "" False NoneErr [] False, Cmd.map (\_ -> TokenWrong) (Navigation.load (UrlBuilder.absolute [""] [])))
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
@@ -70,7 +71,8 @@ update msg model =
         SendCmd ->
             case model.token of
                 Just t ->
-                    ({model | waiting = True}, Http.post ({url = UrlBuilder.absolute ["api", "runcmd", model.command] [UrlBuilder.string "token" t], body = Http.emptyBody,
+                    ({model | waiting = True, isTickAfterEnter = True}
+                        ,Http.post ({url = UrlBuilder.absolute ["api", "runcmd", model.command] [UrlBuilder.string "token" t], body = Http.emptyBody,
                         expect = expectString parseCmdResponse}))
                 Nothing -> wrapModel {model | error = TokenWrongErr}
         SetCmd s -> wrapModel {model | command = s}
@@ -78,8 +80,8 @@ update msg model =
         TokenWrong -> wrapModel {model | error = TokenWrongErr}
         ChangePage req -> (model, (Browser.Navigation.load (reqToString req)))
         ChangeUrl u -> (model, (Browser.Navigation.pushUrl model.key (Url.toString u)))
-        CmdGood str -> wrapModel {model | commandResponse = str, waiting = False, error = NoneErr}
-        CmdBad -> wrapModel {model | error = NoCmd, waiting = False}
+        CmdGood str -> wrapModel {model | commandResponse = str, waiting = False, error = NoneErr, isTickAfterEnter = False}
+        CmdBad -> wrapModel {model | error = NoCmd, waiting = False, isTickAfterEnter = False}
         GotPlayers plL -> wrapModel {model | players = plL}
         UpdatePlayers ->
             case model.token of
@@ -133,7 +135,7 @@ view model =
     {title = "TF2 server manager",
     body = [
         label [for "cmdinput"] [text "Input your command"], nl,
-        input [type_ "text", onInput SetCmd, id "cmdinput"] [], nl,
+        input ([type_ "text", onInput SetCmd, id "cmdinput"] ++ if model.isTickAfterEnter then [value ""] else []) [], nl,
         button [onClick SendCmd] [text "Send command"],nl,
         table [] [
             thead [] [
