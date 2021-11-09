@@ -10,11 +10,11 @@ import Url
 import Url.Builder as UrlBuilder
 import Maybe as Maybe
 import Html.Attributes exposing (..)
-import Http exposing (expectString)
+import Http exposing (expectString, expectWhatever)
 import Result exposing (..)
 import Time
 import Json.Decode exposing (Decoder, field, string, int, map8, list)
-import Browser.Events exposing (onKeyPress)
+import Browser.Events exposing (onKeyDown, onKeyUp)
 
 main : Program () Model Msg
 main =
@@ -50,11 +50,11 @@ type alias Model = {
     waiting : Bool,
     error : AppError,
     players : List Player,
-    isTickAfterEnter : Bool
+    isPressingEnter : Bool
     }
 
-type Msg = SendCmd | SetCmd String | TokenRight | TokenWrong | ChangePage Browser.UrlRequest | ChangeUrl Url.Url | CmdGood String | CmdBad
-    | UpdatePlayers | GotPlayers (List Player) | None
+type Msg = SendCmd | SetCmd String | TokenRight | TokenWrong | ChangePage Browser.UrlRequest | ChangeUrl Url.Url | CmdGood String|
+    CmdBad | UpdatePlayers | GotPlayers (List Player) | UnPressEnter | BanPlayer String | KickPlayer String | None
 
 init : () -> Url.Url -> Navigation.Key -> (Model, Cmd Msg)
 init _ url k =
@@ -65,29 +65,42 @@ init _ url k =
         Nothing ->
             (Model k Nothing "" "" False NoneErr [] False, Cmd.map (\_ -> TokenWrong) (Navigation.load (UrlBuilder.absolute [""] [])))
 
+runCommand t exp cmd =
+    Http.post ({url = UrlBuilder.absolute ["api", "runcmd", cmd] [UrlBuilder.string "token" t], body = Http.emptyBody,
+        expect = exp})
+
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
     case msg of
         SendCmd ->
             case model.token of
                 Just t ->
-                    ({model | waiting = True, isTickAfterEnter = True}
-                        ,Http.post ({url = UrlBuilder.absolute ["api", "runcmd", model.command] [UrlBuilder.string "token" t], body = Http.emptyBody,
-                        expect = expectString parseCmdResponse}))
+                    ({model | waiting = True, isPressingEnter = True}, runCommand t (expectString parseCmdResponse) model.command)
                 Nothing -> wrapModel {model | error = TokenWrongErr}
         SetCmd s -> wrapModel {model | command = s}
         TokenRight -> (model, Cmd.none)
         TokenWrong -> wrapModel {model | error = TokenWrongErr}
         ChangePage req -> (model, (Browser.Navigation.load (reqToString req)))
         ChangeUrl u -> (model, (Browser.Navigation.pushUrl model.key (Url.toString u)))
-        CmdGood str -> wrapModel {model | commandResponse = str, waiting = False, error = NoneErr, isTickAfterEnter = False}
-        CmdBad -> wrapModel {model | error = NoCmd, waiting = False, isTickAfterEnter = False}
-        GotPlayers plL -> wrapModel {model | players = plL}
+        CmdGood str -> wrapModel {model | commandResponse = str, waiting = False, error = NoneErr, isPressingEnter = False}
+        CmdBad -> wrapModel {model | error = NoCmd, waiting = False, isPressingEnter = False}
+        GotPlayers plL -> wrapModel {model | players = plL, isPressingEnter = False}
         UpdatePlayers ->
             case model.token of
                 Just t ->
                     (model, Http.get {url = UrlBuilder.absolute ["api", "getplayers"] [UrlBuilder.string "token" t],
                         expect = Http.expectJson (parseAnyResponse GotPlayers) playerDecoder})
+                Nothing -> wrapModel {model | error = TokenWrongErr}
+        UnPressEnter -> wrapModel {model | isPressingEnter = False}
+        BanPlayer user ->
+            case model.token of
+                Just t ->
+                    ({model | waiting = True}, runCommand t (expectString parseCmdResponse) ("banid 0 " ++ user ++ " kick"))
+                Nothing -> wrapModel {model | error = TokenWrongErr}
+        KickPlayer user ->
+            case model.token of
+                Just t ->
+                    ({model | waiting = True}, runCommand t (expectString parseCmdResponse) ("kickid " ++ user))
                 Nothing -> wrapModel {model | error = TokenWrongErr}
         None -> wrapModel model
 
@@ -123,10 +136,10 @@ onUrlChange = ChangeUrl
 
 subscriptions : Model -> Sub Msg
 subscriptions _ =
-    Sub.batch [Time.every 2500 (\_ -> UpdatePlayers), onKeyPress enterDecoder]
+    Sub.batch [Time.every 2500 (\_ -> UpdatePlayers), onKeyDown (enterDecoder SendCmd), onKeyUp (enterDecoder UnPressEnter)]
 
-enterDecoder = Json.Decode.map (\key -> case key of
-    "Enter" -> SendCmd
+enterDecoder msg = Json.Decode.map (\key -> case key of
+    "Enter" -> msg
     _ -> None) (field "key" string)
 
 
@@ -135,7 +148,7 @@ view model =
     {title = "TF2 server manager",
     body = [
         label [for "cmdinput"] [text "Input your command"], nl,
-        input ([type_ "text", onInput SetCmd, id "cmdinput"] ++ if model.isTickAfterEnter then [value ""] else []) [], nl,
+        input ([type_ "text", onInput SetCmd, id "cmdinput"] ++ if model.isPressingEnter then [value ""] else []) [], nl,
         button [onClick SendCmd] [text "Send command"],nl,
         table [] [
             thead [] [
@@ -150,12 +163,16 @@ view model =
                     th [] [text "Ping (in milliseconds)"],
                     th [] [text "Loss"],
                     th [] [text "Connection status"],
-                    th [] [text "IP adress"]
+                    th [] [text "IP adress"],
+                    th [] [text "Kick player"],
+                    th [] [text "Permanently Ban player"]
                 ]
             ],
             tbody [] (List.map (\p -> tr [] [td [] [text p.name], td [] [text (String.fromInt p.userid)], td [] [text p.steamid],
                 td [] [text (String.fromInt p.time)], td [] [text (String.fromInt p.ping)], td [] [text (String.fromInt p.loss)],
-                td [] [text p.connectionStatus], td [] [text p.playerAdress]]) model.players)
+                td [] [text p.connectionStatus], td [] [text p.playerAdress],
+                td [] [button [onClick (KickPlayer (String.fromInt p.userid))] [text ("Kick " ++ p.name)]],
+                td [] [button [onClick (BanPlayer (String.fromInt p.userid))] [text ("Permaban " ++ p.name)]]]) model.players)
         ]] ++
         List.concatMap (\s -> [text s, nl]) (String.split "\n" model.commandResponse) ++ [nl,
         if model.waiting then

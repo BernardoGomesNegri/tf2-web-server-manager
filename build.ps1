@@ -26,7 +26,7 @@ if ($IsWindows)
 $exe_path = "./out/build/" + $system + "/ghc-" + $ghcver + "/tf2-server-manager-" + $version + "/x/tf2-server-manager/build/tf2-server-manager/" + $exe
 $out_exe = "./out/" + $exe
 Write-Host ("Copying: " + $exe_path)
-Copy-Item $exe_path $out_exe -Force
+Move-Item $exe_path $out_exe -Force
 Remove-Item "./out/build" -Recurse
 Remove-Item "./out/cache" -Recurse
 Remove-Item "./out/packagedb" -Recurse
