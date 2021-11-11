@@ -109,7 +109,7 @@ update msg model =
                     case model.askingFor of
                         Just ak ->
                             case ak.method of
-                                Ban -> ({model | waiting = True}, runCommand t (expectString parseCmdResponse) ("banid " ++ ak.player))
+                                Ban -> ({model | waiting = True}, runCommand t (expectString parseCmdResponse) ("banid 0 " ++ ak.player))
                                 Kick -> ({model | waiting = True}, runCommand t (expectString parseCmdResponse) ("kickid " ++ ak.player))
                         Nothing -> wrapModel model
                 Nothing -> wrapModel {model | error = TokenWrongErr}
