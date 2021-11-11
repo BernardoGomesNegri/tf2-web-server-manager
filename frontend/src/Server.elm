@@ -10,10 +10,10 @@ import Url
 import Url.Builder as UrlBuilder
 import Maybe as Maybe
 import Html.Attributes exposing (..)
-import Http exposing (expectString, expectWhatever)
+import Http exposing (expectString)
 import Result exposing (..)
 import Time
-import Json.Decode exposing (Decoder, field, string, int, map8, list)
+import Json.Decode exposing (Decoder, field, string, int, map8)
 import Browser.Events exposing (onKeyDown, onKeyUp)
 
 main : Program () Model Msg
@@ -109,7 +109,7 @@ update msg model =
                     case model.askingFor of
                         Just ak ->
                             case ak.method of
-                                Ban -> ({model | waiting = True}, runCommand t (expectString parseCmdResponse) ("banid 0 " ++ ak.player))
+                                Ban -> ({model | waiting = True}, runCommand t (expectString parseCmdResponse) ("banid 0 " ++ ak.player ++ ";kickid " ++ ak.player))
                                 Kick -> ({model | waiting = True}, runCommand t (expectString parseCmdResponse) ("kickid " ++ ak.player))
                         Nothing -> wrapModel model
                 Nothing -> wrapModel {model | error = TokenWrongErr}
@@ -158,6 +158,16 @@ enterDecoder msg = Json.Decode.map (\key -> case key of
     "Enter" -> msg
     _ -> None) (field "key" string)
 
+steamIdToCommId : String -> Maybe String
+steamIdToCommId idS =
+    if idS == "BOT" then
+        Nothing
+    else
+        -- Instructions from https://developer.valvesoftware.com/wiki/SteamID#Steam_ID_as_a_Steam_Community_ID
+        Just ("https://steamcommunity.com/profiles/" ++ idS)
+
+listIndex n l =
+    List.head (List.drop (n + 1) l)
 
 view : Model -> Browser.Document Msg
 view model =
@@ -184,7 +194,10 @@ view model =
                     th [] [text "Permanently Ban player"]
                 ]
             ],
-            tbody [] (List.map (\p -> tr [] [td [] [text p.name], td [] [text (String.fromInt p.userid)], td [] [text p.steamid],
+            tbody [] (List.map (\p -> tr [] [td [] [text p.name], td [] [text (String.fromInt p.userid)],
+                td [] [case steamIdToCommId p.steamid of
+                    Just s -> a [href s] [text p.steamid]
+                    Nothing -> text p.steamid],
                 td [] [text (String.fromInt p.time)], td [] [text (String.fromInt p.ping)], td [] [text (String.fromInt p.loss)],
                 td [] [text p.connectionStatus], td [] [text p.playerAdress],
                 td [] [button [onClick (KickPlayer p)] [text ("Kick " ++ p.name)]],
