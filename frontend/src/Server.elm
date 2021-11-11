@@ -1,4 +1,4 @@
-module Server exposing (..)
+port module Server exposing (..)
 
 import Browser.Navigation
 import Browser
@@ -29,6 +29,9 @@ main =
 
 type alias Token = String
 
+port askConfirm : String -> Cmd msg
+port askConfirmResult : (Bool -> msg) -> Sub msg
+
 type alias Player = {
     userid : Int,
     name : String,
@@ -50,20 +53,28 @@ type alias Model = {
     waiting : Bool,
     error : AppError,
     players : List Player,
-    isPressingEnter : Bool
+    isPressingEnter : Bool,
+    askingFor : Maybe BanKickPlayer
     }
 
+type alias BanKickPlayer = {
+    method : BanKick,
+    player : String
+    }
+
+type BanKick = Ban | Kick
+
 type Msg = SendCmd | SetCmd String | TokenRight | TokenWrong | ChangePage Browser.UrlRequest | ChangeUrl Url.Url | CmdGood String|
-    CmdBad | UpdatePlayers | GotPlayers (List Player) | UnPressEnter | BanPlayer String | KickPlayer String | None
+    CmdBad | UpdatePlayers | GotPlayers (List Player) | UnPressEnter | BanPlayer String | KickPlayer String | DoBan | DoKick | None
 
 init : () -> Url.Url -> Navigation.Key -> (Model, Cmd Msg)
 init _ url k =
     let token = grabParam url "token" in
     case token of
         Just t ->
-            (Model k (Just t) "" "" False NoneErr [] False, Http.get ({url = UrlBuilder.absolute ["api", "validate", t] [], expect = expectString parseToken}))
+            (Model k (Just t) "" "" False NoneErr [] False Nothing, Http.get ({url = UrlBuilder.absolute ["api", "validate", t] [], expect = expectString parseToken}))
         Nothing ->
-            (Model k Nothing "" "" False NoneErr [] False, Cmd.map (\_ -> TokenWrong) (Navigation.load (UrlBuilder.absolute [""] [])))
+            (Model k Nothing "" "" False NoneErr [] False Nothing, Cmd.map (\_ -> TokenWrong) (Navigation.load (UrlBuilder.absolute [""] [])))
 
 runCommand t exp cmd =
     Http.post ({url = UrlBuilder.absolute ["api", "runcmd", cmd] [UrlBuilder.string "token" t], body = Http.emptyBody,
@@ -92,16 +103,24 @@ update msg model =
                         expect = Http.expectJson (parseAnyResponse GotPlayers) playerDecoder})
                 Nothing -> wrapModel {model | error = TokenWrongErr}
         UnPressEnter -> wrapModel {model | isPressingEnter = False}
-        BanPlayer user ->
+        DoKick ->
             case model.token of
                 Just t ->
-                    ({model | waiting = True}, runCommand t (expectString parseCmdResponse) ("banid 0 " ++ user ++ " kick"))
+                    case model.askingFor of
+                        Just ak ->
+                            ({model | waiting = True}, runCommand t (expectString parseCmdResponse) ("kickid " ++ ak.player))
+                        Nothing -> wrapModel model
                 Nothing -> wrapModel {model | error = TokenWrongErr}
-        KickPlayer user ->
+        DoBan ->
             case model.token of
                 Just t ->
-                    ({model | waiting = True}, runCommand t (expectString parseCmdResponse) ("kickid " ++ user))
+                    case model.askingFor of
+                        Just ak ->
+                            ({model | waiting = True}, runCommand t (expectString parseCmdResponse) ("banid " ++ ak.player))
+                        Nothing -> wrapModel model
                 Nothing -> wrapModel {model | error = TokenWrongErr}
+        KickPlayer u -> ({model | askingFor = Just (BanKickPlayer Kick (String.fromInt u.userid))}, askConfirm ("Are you sure you kick: " ++ u.name ++ "?"))
+        BanPlayer u -> ({model | askingFor = Just (BanKickPlayer Ban (String.fromInt u.userid))}, askConfirm ("Are you sure you permanently ban: " ++ u.name ++ "?"))
         None -> wrapModel model
 
 playerDecoder : Decoder (List Player)
@@ -171,8 +190,8 @@ view model =
             tbody [] (List.map (\p -> tr [] [td [] [text p.name], td [] [text (String.fromInt p.userid)], td [] [text p.steamid],
                 td [] [text (String.fromInt p.time)], td [] [text (String.fromInt p.ping)], td [] [text (String.fromInt p.loss)],
                 td [] [text p.connectionStatus], td [] [text p.playerAdress],
-                td [] [button [onClick (KickPlayer (String.fromInt p.userid))] [text ("Kick " ++ p.name)]],
-                td [] [button [onClick (BanPlayer (String.fromInt p.userid))] [text ("Permaban " ++ p.name)]]]) model.players)
+                td [] [button [onClick (KickPlayer p)] [text ("Kick " ++ p.name)]],
+                td [] [button [onClick (BanPlayer p)] [text ("Permaban " ++ p.name)]]]) model.players)
         ]] ++
         List.concatMap (\s -> [text s, nl]) (String.split "\n" model.commandResponse) ++ [nl,
         if model.waiting then

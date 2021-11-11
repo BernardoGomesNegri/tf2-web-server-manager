@@ -9,15 +9,38 @@
     input {
       width: 40 ch;
     }
+    table,th,td {
+        border: 1px solid
+    }
+    table {
+        width: 100%;
+        height: 34ex;
+        margin: 0 auto;
+        display: block;
+        overflow-x: auto;
+        border-spacing: 0;
+    }
+    tbody {
+        white-space: nowrap;
+    }
+    th {
+        position: sticky;
+        top: 0;
+        background: #fff;
+        vertical-align: bottom;
+    }  
   </style>
 </head>
 
 <body>
-  <div id="myapp"></div>
-  <script>
-  var app = Elm.Server.init({
-    node: document.getElementById('myapp')
-  });
-  </script>
+    <div id="myapp"></div>
+    <script>
+    var app = Elm.Server.init({
+        node: document.getElementById('myapp')
+    });
+    app.ports.askConfirm.subscribe(function(text) {
+        app.ports.askConfirmResult.send(window.confirm(text));
+    });
+    </script>
 </body>
 </html>
