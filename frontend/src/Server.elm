@@ -65,7 +65,7 @@ type alias BanKickPlayer = {
 type BanKick = Ban | Kick
 
 type Msg = SendCmd | SetCmd String | TokenRight | TokenWrong | ChangePage Browser.UrlRequest | ChangeUrl Url.Url | CmdGood String|
-    CmdBad | UpdatePlayers | GotPlayers (List Player) | UnPressEnter | BanPlayer String | KickPlayer String | DoBan | DoKick | None
+    CmdBad | UpdatePlayers | GotPlayers (List Player) | UnPressEnter | BanPlayer Player | KickPlayer Player | Confirm | None
 
 init : () -> Url.Url -> Navigation.Key -> (Model, Cmd Msg)
 init _ url k =
@@ -103,24 +103,20 @@ update msg model =
                         expect = Http.expectJson (parseAnyResponse GotPlayers) playerDecoder})
                 Nothing -> wrapModel {model | error = TokenWrongErr}
         UnPressEnter -> wrapModel {model | isPressingEnter = False}
-        DoKick ->
-            case model.token of
+        Confirm ->
+             case model.token of
                 Just t ->
                     case model.askingFor of
                         Just ak ->
-                            ({model | waiting = True}, runCommand t (expectString parseCmdResponse) ("kickid " ++ ak.player))
+                            case ak.method of
+                                Ban -> ({model | waiting = True}, runCommand t (expectString parseCmdResponse) ("banid " ++ ak.player))
+                                Kick -> ({model | waiting = True}, runCommand t (expectString parseCmdResponse) ("kickid " ++ ak.player))
                         Nothing -> wrapModel model
                 Nothing -> wrapModel {model | error = TokenWrongErr}
-        DoBan ->
-            case model.token of
-                Just t ->
-                    case model.askingFor of
-                        Just ak ->
-                            ({model | waiting = True}, runCommand t (expectString parseCmdResponse) ("banid " ++ ak.player))
-                        Nothing -> wrapModel model
-                Nothing -> wrapModel {model | error = TokenWrongErr}
-        KickPlayer u -> ({model | askingFor = Just (BanKickPlayer Kick (String.fromInt u.userid))}, askConfirm ("Are you sure you kick: " ++ u.name ++ "?"))
-        BanPlayer u -> ({model | askingFor = Just (BanKickPlayer Ban (String.fromInt u.userid))}, askConfirm ("Are you sure you permanently ban: " ++ u.name ++ "?"))
+        KickPlayer u -> ({model | askingFor = Just (BanKickPlayer Kick (String.fromInt u.userid))},
+            askConfirm ("Are you sure you wish to kick: " ++ u.name ++ "?"))
+        BanPlayer u -> ({model | askingFor = Just (BanKickPlayer Ban (String.fromInt u.userid))},
+            askConfirm ("Are you sure you wish to permanently ban: " ++ u.name ++ "?"))
         None -> wrapModel model
 
 playerDecoder : Decoder (List Player)
@@ -155,7 +151,8 @@ onUrlChange = ChangeUrl
 
 subscriptions : Model -> Sub Msg
 subscriptions _ =
-    Sub.batch [Time.every 2500 (\_ -> UpdatePlayers), onKeyDown (enterDecoder SendCmd), onKeyUp (enterDecoder UnPressEnter)]
+    Sub.batch [Time.every 2500 (\_ -> UpdatePlayers), onKeyDown (enterDecoder SendCmd), onKeyUp (enterDecoder UnPressEnter), askConfirmResult (\res ->
+        if res then Confirm else None)]
 
 enterDecoder msg = Json.Decode.map (\key -> case key of
     "Enter" -> msg
