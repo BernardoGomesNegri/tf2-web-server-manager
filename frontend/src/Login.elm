@@ -8,6 +8,8 @@ import Url
 import Url.Builder as UrlBuilder
 import Maybe as Maybe
 import Html.Attributes exposing (..)
+import Json.Decode exposing (Decoder, field, string, int, map8)
+import Browser.Events exposing (onKeyPress)
 
 main : Program () Model Msg
 main =
@@ -37,7 +39,7 @@ type alias Model = {
     }
 
 type Msg = SetPort String | SetAdress String | SetPassword String | Login | ChangePage Browser.UrlRequest | ChangeUrl Url.Url | GotToken Token
-    | TokenError AppError
+    | TokenError AppError | None
 
 init : () -> Url.Url -> Navigation.Key -> (Model, Cmd Msg)
 init () _ key =
@@ -47,7 +49,12 @@ init () _ key =
 
 subscriptions : Model -> Sub Msg
 subscriptions _ =
-    Sub.none
+    onKeyPress enterDecoder
+
+enterDecoder =
+    Json.Decode.map (\key -> case key of
+        "Enter" -> Login
+        _ -> None) (field "key" string)
 
 update : Msg -> Model ->  ( Model, Cmd Msg )
 update msg model =
@@ -86,6 +93,7 @@ update msg model =
             (model, Navigation.load (UrlBuilder.absolute ["server"] [UrlBuilder.string "token" t]))
         TokenError err ->
             ({model | error = (Just err)}, Cmd.none)
+        None -> (model, Cmd.none)
 
 apiResToMsg : Result AppError Token -> Msg
 apiResToMsg res =

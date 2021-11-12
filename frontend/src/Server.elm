@@ -196,7 +196,7 @@ view model =
                 ]
             ],
             tbody [] (List.map (\p -> tr [] [td [] [case steamIdToCommId p.steamid of
-                    Just s -> a [href s] [text p.name]
+                    Just s -> a [href s, target "_blank"] [text p.name]
                     Nothing -> text p.name], td [] [text (String.fromInt p.userid)],
                 td [] [text p.steamid],
                 td [] [text (String.fromInt p.time)], td [] [text (String.fromInt p.ping)], td [] [text (String.fromInt p.loss)],
