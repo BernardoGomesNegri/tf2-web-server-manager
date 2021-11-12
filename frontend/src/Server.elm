@@ -163,7 +163,8 @@ steamIdToCommId idS =
     if idS == "BOT" then
         Nothing
     else
-        -- Instructions from https://developer.valvesoftware.com/wiki/SteamID#Steam_ID_as_a_Steam_Community_ID
+        -- Instructions from https://developer.valvesoftware.com/wiki/SteamID#Steam_ID_as_a_Steam_Community_ID (in the section "for 32 bit systems",
+        -- it works on 64 bit systems too)
         Just ("https://steamcommunity.com/profiles/" ++ idS)
 
 listIndex n l =
