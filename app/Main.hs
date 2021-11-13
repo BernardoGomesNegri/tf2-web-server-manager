@@ -118,8 +118,9 @@ api = do
                         Right l -> json l
                         Left e -> status status503 >> text (pack $ show e)
                 Nothing -> status status503 >> text "error"
-    
+#ifdef DEBUG
     middleware logStdoutDev
+#endif
     middleware $ staticPolicy (noDots >-> isNotAbsolute >-> addBase "frontend")
 
 parseUntilX :: Char -> Parsec String () Char -> Parsec String () String

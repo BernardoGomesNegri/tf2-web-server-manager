@@ -178,6 +178,8 @@ view model =
         label [for "cmdinput"] [text "Input your command"], nl,
         input ([type_ "text", onInput SetCmd, id "cmdinput"] ++ if model.isPressingEnter then [value ""] else []) [], nl,
         button [onClick SendCmd] [text "Send command"],nl,
+        div [id "response-container"]
+        (List.concatMap (\s -> [text s, nl]) (String.split "\n" model.commandResponse))] ++ [nl,
         table [] [
             thead [] [
                 tr [] [
@@ -204,8 +206,7 @@ view model =
                 td [] [text p.connectionStatus], td [] [text p.playerAdress],
                 td [] [button [onClick (KickPlayer p)] [text ("Kick " ++ p.name)]],
                 td [] [button [onClick (BanPlayer p)] [text ("Permaban " ++ p.name)]]]) model.players)
-        ]] ++
-        List.concatMap (\s -> [text s, nl]) (String.split "\n" model.commandResponse) ++ [nl,
+        ],
         if model.waiting then
             text "Waiting for server response"
         else
