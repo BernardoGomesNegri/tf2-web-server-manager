@@ -56,6 +56,7 @@ modify f = ask >>= liftIO . atomically . flip modifyTVar' f
 
 main :: IO ()
 main = do
+    -- Instructions from https://github.com/scotty-web/scotty/blob/master/examples/globalstate.hs
     sync <- newTVarIO def
     let runActionToIO m = runReaderT (runWebM m) sync
     args <- getArgs
