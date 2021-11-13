@@ -65,6 +65,7 @@ main = do
         Just p -> scottyT p runActionToIO (web >> api)
         Nothing -> scottyT 3000 runActionToIO (web >> api)
 
+safeHead :: [a] -> Maybe a
 safeHead [] = Nothing
 safeHead (x:_) = Just x
 
