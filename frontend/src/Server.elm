@@ -69,12 +69,13 @@ type Msg = SendCmd | SetCmd String | TokenRight | TokenWrong | ChangePage Browse
 
 init : () -> Url.Url -> Navigation.Key -> (Model, Cmd Msg)
 init _ url k =
-    let token = grabParam url "token" in
+    let token = grabParam url "token"
+        mainModel t = Model k t "" "" False NoneErr [] False Nothing in
     case token of
         Just t ->
-            (Model k (Just t) "" "" False NoneErr [] False Nothing, Http.get ({url = UrlBuilder.absolute ["api", "validate", t] [], expect = expectString parseToken}))
+            (mainModel (Just t), Http.get ({url = UrlBuilder.absolute ["api", "validate", t] [], expect = expectString parseToken}))
         Nothing ->
-            (Model k Nothing "" "" False NoneErr [] False Nothing, Cmd.map (\_ -> TokenWrong) (Navigation.load (UrlBuilder.absolute [""] [])))
+            (mainModel Nothing, Cmd.map (\_ -> TokenWrong) (Navigation.load (UrlBuilder.absolute [""] [])))
 
 runCommand t exp cmd =
     Http.post ({url = UrlBuilder.absolute ["api", "runcmd", cmd] [UrlBuilder.string "token" t], body = Http.emptyBody,
