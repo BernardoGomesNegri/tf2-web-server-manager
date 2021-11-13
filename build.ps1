@@ -10,7 +10,7 @@ else
     $extraelmflags = ""
 }
 $ghcver = Invoke-Expression -Command "ghc --numeric-version"
-$version = "1.2.1.0"
+$version = "1.3.0.0"
 New-Item -ItemType Directory -Force -Path out
 New-Item -ItemType Directory -Force -Path out/frontend
 if ($IsLinux)
