@@ -19,7 +19,15 @@ import Data.Text.Lazy(Text, pack, append)
 import Text.Read (readMaybe)
 import System.Environment (getArgs)
 import GHC.Generics (Generic)
-import Data.Aeson (ToJSON)
+import Data.Aeson (ToJSON, toJSON, object, (.=))
+
+(!?) :: [a] -> Int -> Maybe a
+xs !? n =
+    -- Copied from https://hackage.haskell.org/package/extra-1.7.10/docs/src/Data.List.Extra.html#%21%3F
+    if n < 0 then Nothing else
+    foldr (\x r k -> case k of
+        0 -> Just x
+        _ -> r (k-1)) (const Nothing) xs n
 
 type Token = String
 newtype State = State {unstate :: Map.Map Token Connection}
@@ -43,7 +51,20 @@ data Player = Player {
     playerAdress :: String
 } deriving (Generic, Show)
 
+data BanEntry = Id {
+    bannedId :: String,
+    banTimeId :: Int
+} | Ip {
+    bannedIp :: String,
+    banTimeIp :: Int
+} deriving (Generic)
+
 instance ToJSON Player where
+instance ToJSON BanEntry where
+    toJSON Id {bannedId = idban, banTimeId = time} =
+        object ["number" .= idban, "isip" .= False, "time" .= time, "is_permanent" .= (time == 0)]
+    toJSON Ip {bannedIp = idban, banTimeIp = time} =
+        object ["number" .= idban, "isip" .= True, "time" .= time, "is_permanent" .= (time == 0)]
 
 webM :: MonadTrans t => WebM a -> t WebM a
 webM = lift
@@ -122,11 +143,22 @@ api = do
                 Nothing -> status status503 >> text "error"
 
     get "/api/banlist" $ withToken $ \token conn -> do
-        let splitStuff c = map (map words . lines) (sendCmd c conn)
-        ipList <- liftIO $ splitStuff "listip"
-        userList <- liftIO $ splitStuff "listid"
+        let splitStuff :: String -> IO [[String]]
+            splitStuff c = do
+                res <- sendCmd c conn
+                case res of
+                    Nothing -> return []
+                    Just r ->
+                        let all = (map words . lines) r in
+                        return all
+            parseGeneric :: (String -> Int -> a) -> [String] -> Maybe a
+            parseGeneric c s = c <$> (s !? 1) <*> ((s !? 2) >>= (\s' -> if s' == "permanent" then pure 0 :: Maybe Int else readMaybe s' >>= (return . round)))
+            parseIp = parseGeneric Ip
+            parseId = parseGeneric Id
+        ipList <- liftIO $ map parseIp <$> splitStuff "listip"
+        idList <- liftIO $ map parseId <$> splitStuff "listid"
+        json (idList <> ipList)
         
-
 #ifdef DEBUG
     middleware logStdoutDev
 #endif
