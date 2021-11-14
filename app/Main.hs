@@ -120,6 +120,13 @@ api = do
                         Right l -> json l
                         Left e -> status status503 >> text (pack $ show e)
                 Nothing -> status status503 >> text "error"
+
+    get "/api/banlist" $ withToken $ \token conn -> do
+        let splitStuff c = map (map words . lines) (sendCmd c conn)
+        ipList <- liftIO $ splitStuff "listip"
+        userList <- liftIO $ splitStuff "listid"
+        
+
 #ifdef DEBUG
     middleware logStdoutDev
 #endif
