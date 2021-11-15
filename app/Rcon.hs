@@ -1,4 +1,4 @@
-module Rcon where
+module Rcon(RequestType(..), Connection, ConnErr(..), sendCmd, newConn, withConn) where
 import Network.Simple.TCP
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL

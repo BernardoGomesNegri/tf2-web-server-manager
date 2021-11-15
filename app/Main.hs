@@ -155,9 +155,12 @@ api = do
             parseGeneric c s = c <$> (s !? 1) <*> ((s !? 2) >>= (\s' -> if s' == "permanent" then pure 0 :: Maybe Int else readMaybe s' >>= (return . round)))
             parseIp = parseGeneric Ip
             parseId = parseGeneric Id
-        ipList <- liftIO $ map parseIp <$> splitStuff "listip"
-        idList <- liftIO $ map parseId <$> splitStuff "listid"
-        json (idList <> ipList)
+        ipList <- liftIO $ fmap sequenceA (map parseIp <$> splitStuff "listip")
+        idList <- liftIO $ fmap sequenceA (map parseId <$> splitStuff "listid")
+        case (idList, ipList) of
+            (Just idL, Just ipL) -> json (idList <> ipList)
+            _ -> status status503 >> text "error"
+        
         
 #ifdef DEBUG
     middleware logStdoutDev
