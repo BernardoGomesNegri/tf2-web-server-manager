@@ -14,6 +14,7 @@ import System.Random(randomIO)
 import TransHelpers
 import Control.Monad (join)
 
+-- Everything about the RCON protocol is documented at https://developer.valvesoftware.com/wiki/Source_RCON_Protocol
 
 individualWait = 10000
 numberWait = 50
@@ -89,7 +90,7 @@ authenticateConn Connection { port = port, adress = adress, password = pwd} sock
     send socket (createPackage pwd 123123 Auth)
     response <- runMaybeT $ getServerPacket socket Nothing
     case response of
-        Just r -> do
+        Just _ -> do
             newResM <- runMaybeT $ getServerPacket socket Nothing
             case newResM of
                 Just newRes ->
@@ -146,6 +147,9 @@ createPackage command idInt reqType =
         null = UTF8.fromString "\0\0"
 
 sendCmd :: String -> Connection -> IO (Maybe String)
+-- We need to trim off the first line because the input comes like this:
+-- command
+-- command output
 sendCmd s c = runMaybeT $ unlines . safeInit . lines <$> sendCmdInternal s c
 
 safeInit [] = []
@@ -157,18 +161,23 @@ sendCmdInternal body conn =
     withConn conn $ \socket -> do
         id <- randomIO
         let package = createPackage body id Command
+        -- The reason we create a dummy packet is because when a packet response exceeds
+        -- 4096 bytes, the server will send two responses.
+        -- By sending a dummy package that should not be valid,
+        -- the server will simply mirror the dummy packet back to us,
+        -- but only after it has already sent the response for the first packet
+        -- See more at https://developer.valvesoftware.com/wiki/Source_RCON_Protocol#Multiple-packet_Responses
         let dummyPackage = createPackage "" 0 CommandResponse
         send socket package
         send socket dummyPackage
         print $ "sent command: " ++ body ++ " to server"
         let go total = do
                 response <- runMaybeT $ getServerPacket socket (Just id)
-                let result = (case response of
+                case response of
                         Just Packet {reqType = reqType, body = body} ->
                             case reqType of
                                 CommandResponse -> do
                                     if body == "" then return $ return (total ++ body) else go (total ++ body)
                                 _ -> return Nothing
-                        _ -> return $ Just (total ++ body))
-                result
+                        _ -> return $ Just (total ++ body)
         go "")
