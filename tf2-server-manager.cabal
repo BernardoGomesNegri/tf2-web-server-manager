@@ -1,5 +1,5 @@
 cabal-version:      2.4
-name:               tf2-server-manager
+name:               tf2-web-server-manager
 version:            1.3.0.0
 
 -- A short (one-line) description of the package.
@@ -27,7 +27,7 @@ Flag debug {
     Default: False
     }
 
-executable tf2-server-manager
+executable tf2-web-server-manager
     main-is:          Main.hs
 
     -- Modules included in this executable, other than Main.

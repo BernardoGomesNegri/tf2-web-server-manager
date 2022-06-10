@@ -10,16 +10,15 @@ ELM-OPTS =
 CABAL-OPTS =
 
 ifeq ($(OS),Windows_NT)
-	EXE-NAME=tf2-server-manager.exe
+	EXE-NAME=tf2-web-server-manager.exe
 else
-	EXE-NAME=tf2-server-manager
+	EXE-NAME=tf2-web-server-manager
 endif
 
 # For every file on the ELM-SRC list (with its suffix replaced by .js), remove everything but
 # the filename, and join it with $(BUILD-FRONTEND)
 ELM-OUT := $(foreach file,$(ELM-SRC:.elm=.js),$(join $(BUILD-FRONTEND),$(notdir $(file))))
 STATIC-OUT = $(foreach file,$(FRONTEND-STATIC),$(join $(BUILD-FRONTEND),$(notdir $(file))))
-
 FRONTEND= $(ELM-OUT) $(STATIC-OUT)
 
 .SUFFIXES: 
