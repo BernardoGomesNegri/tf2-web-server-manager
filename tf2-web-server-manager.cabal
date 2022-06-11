@@ -52,6 +52,7 @@ executable tf2-web-server-manager
     build-depends: aeson
     build-depends: utf8-string
     build-depends: random
+    build-depends: warp
     build-depends: wai-extra
     build-depends: wai-middleware-static
     build-depends: containers
