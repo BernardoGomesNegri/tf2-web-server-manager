@@ -21,7 +21,9 @@ cabal.project.local
 cabal.project.local~
 .HTF/
 .ghc.environment.*
+
 out/
+build/
 
 #elm
 frontend/elm-stuff

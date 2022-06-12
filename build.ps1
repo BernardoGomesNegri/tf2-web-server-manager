@@ -25,19 +25,19 @@ New-Item -ItemType Directory -Force -Path out/frontend
 if ($IsLinux)
 {
     $system = "x86_64-linux"
-    $exe = "tf2-server-manager"
+    $exe = "tf2-web-server-manager"
 }
 if ($IsWindows)
 {
     $system = "x86_64-windows"
-    $exe = "tf2-server-manager.exe"
+    $exe = "tf2-web-server-manager.exe"
 }
-$exe_path = "./out/build/" + $system + "/ghc-" + $ghcver + "/tf2-server-manager-" + $version + "/x/tf2-server-manager/build/tf2-server-manager/" + $exe
+$exe_path = "./out/build/" + $system + "/ghc-" + $ghcver + "/tf2-web-server-manager-" + $version + "/x/tf2-web-server-manager/build/tf2-web-server-manager/" + $exe
 $out_exe = "./out/" + $exe
 Write-Host ("Copying: " + $exe_path)
 Copy-Item $exe_path $out_exe -Force
 cd frontend
 Get-ChildItem static | Copy-Item -Destination ../out/frontend -Recurse
-elm make src/Login.elm --output=../out/frontend/login.js $extraelmflags
-elm make src/Server.elm --output=../out/frontend/server.js $extraelmflags
+elm make src/login.elm --output=../out/frontend/login.js $extraelmflags
+elm make src/server.elm --output=../out/frontend/server.js $extraelmflags
 cd ..
