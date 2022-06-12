@@ -3,6 +3,7 @@ module Main where
 import Rcon
 import Network.Wai.Middleware.RequestLogger(logStdoutDev)
 import Network.Wai.Middleware.Static hiding ((<|>))
+import Network.Wai.Handler.Warp(Settings, defaultSettings, setPort)
 import Text.Parsec hiding (State)
 import Network.HTTP.Types.Status(status403, status503, status200)
 import Data.Default.Class(Default, def)
@@ -17,6 +18,7 @@ import Web.Scotty.Trans
 import System.Random(randomIO, randoms, getStdRandom, randomR)
 import Data.Text.Lazy(Text, pack, append)
 import Text.Read (readMaybe)
+import Data.Maybe(fromMaybe)
 import System.Environment (getArgs)
 import GHC.Generics (Generic)
 import Data.Aeson (ToJSON, toJSON, object, (.=))
@@ -81,10 +83,13 @@ main = do
     sync <- newTVarIO def
     let runActionToIO m = runReaderT (runWebM m) sync
     args <- getArgs
-    let port = safeHead args >>= readMaybe :: Maybe Int
-    case port of
-        Just p -> scottyT p runActionToIO (web >> api)
-        Nothing -> scottyT 3000 runActionToIO (web >> api)
+    let port = fromMaybe 3000 (safeHead args >>= readMaybe) :: Int
+    let opts = def {verbose = 0, settings = setPort port defaultSettings}
+    
+    putStrLn ("Starting server on port: " <> show port)
+    putStrLn ("Visit http://localhost:" <> show port)
+
+    scottyOptsT opts runActionToIO (web >> api)
 
 safeHead :: [a] -> Maybe a
 safeHead [] = Nothing
