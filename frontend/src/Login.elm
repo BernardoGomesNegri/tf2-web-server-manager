@@ -78,7 +78,8 @@ update msg model =
                 Nothing ->
                     ({model | error = Just NotPossible}, Cmd.none)
                 Just req ->
-                    (model, Http.get {
+                    (model, Http.post {
+                        body = Http.emptyBody,
                         url = req,
                         expect = Http.expectStringResponse apiResToMsg responseToResult
                     })

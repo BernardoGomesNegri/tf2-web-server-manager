@@ -112,7 +112,7 @@ api = do
                     status status503
                     text "error")
 
-    get "/api/gettoken" $ do
+    post "/api/gettoken" $ do
         port <- param "port"
         adressName <- param "adress"
         pwd <- param "password"
