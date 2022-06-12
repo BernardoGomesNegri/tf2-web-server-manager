@@ -46,6 +46,7 @@ executable tf2-web-server-manager
     other-extensions: CPP, DeriveGeneric
     build-depends: base >=4.14.3.0
     build-depends: scotty
+    build-depends: libssh2
     build-depends: bytestring
     build-depends: parsec
     build-depends: network-simple
@@ -64,6 +65,5 @@ executable tf2-web-server-manager
     build-depends: text
     build-depends: transformers
     build-depends: cpphs
-    build-depends: process
     hs-source-dirs:   app
     default-language: Haskell2010

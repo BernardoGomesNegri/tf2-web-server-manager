@@ -3,35 +3,49 @@ module SSHTunneling where
 import Control.Monad.Trans(lift)
 import Control.Monad.Trans.Maybe(MaybeT(MaybeT), runMaybeT)
 import System.IO(Handle)
-import Control.Exception(catch)
-import System.Process
-import TransHelpers
+import Control.Exception(handle)
+import Data.ByteString (ByteString)
+import Control.Concurrent (forkIO)
+import Control.Concurrent.STM.TQueue
 import Network.Simple.TCP (HostName)
+import Network.SSH.Client.LibSSH2 (withSession)
+import Network.SSH.Client.LibSSH2.Foreign (usernamePasswordAuth)
+import TransHelpers
 
 type Port = Int
 type PID = Int
+
+data Msg = Send ByteString | Recv Int | Close
+
+-- We keep two queues. One is for sending messages, one is for receiving data.
+data SSHState = SSHState {
+    sshStateInQueue :: TQueue Msg,
+    sshStateOutQueue :: TQueue ByteString
+}
 
 data Location = Location HostName Port
 
 data SSHLogin = SSHLogin {
     loginLocation :: Location,
-    loginUsername :: String
+    loginUsername :: String,
+    loginPassword :: String
 }
 
-data SSHConn = SSHConn {
-    connLocation :: Location,
-    connPHandle :: ProcessHandle
+data SSHConnection = SSHConn {
+    sshConnState :: SSHState,
+    sshConnWrite :: ByteString -> IO (),
+    sshConnRecv :: Int -> IO ByteString
 }
 
--- We'll allocate ports in ascending order, the list will be in descending order.
--- Params: List of ports we can run, ssh binary path,
--- lower and upper limits on port numbers, SSH username,
--- remote host, port to connect on remote host, log handle.
-setUpSsh :: [Port] -> Maybe String -> (Maybe Port, Maybe Port) -> SSHLogin -> Handle -> MaybeT IO SSHConn
-setUpSsh list sshBinM (lower, upper) user sshdata = catch setup err
+-- Params: The login and location of the SSH server, the location
+-- and port of the TF2 server
+setUpSsh :: SSHLogin -> String -> Port -> MaybeT IO SSHConnection
+setUpSsh SSHLogin {loginLocation = (Location host port), loginUsername = user,
+         loginPassword = password} destHost destPort =
+    (lift . handle err) $ do
+        withSession host port $ \session -> do
+            usernamePasswordAuth session user password
+            chan <- directTcpIpEx destHost destPort "127.0.0.1" 22
+            forkIO ()
     where
-        sshBin = maybe "ssh" id sshBinM
-        setup = do
-            createProcess (proc shhBin [
-                ""
-            ])
+        

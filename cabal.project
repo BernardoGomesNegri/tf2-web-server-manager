@@ -1,0 +1,7 @@
+packages: ./*.cabal
+
+source-repository-package
+    type: git
+    location: https://github.com/BernardoGomesNegri/libssh2-hs
+    tag: 5c9a02d1273bdf3d7da298e6d65cc086d27663c4
+    subdir: libssh2
