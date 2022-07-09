@@ -85,7 +85,10 @@ main = do
     args <- getArgs
     let port = fromMaybe 3000 (safeHead args >>= readMaybe) :: Int
     let opts = def {verbose = 0, settings = setPort port defaultSettings}
-    
+
+#ifdef DEBUG
+    putStrLn "debug on"
+#endif    
     putStrLn ("Starting server on port: " <> show port)
     putStrLn ("Visit http://localhost:" <> show port)
 

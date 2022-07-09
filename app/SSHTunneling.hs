@@ -15,10 +15,8 @@ import TransHelpers
 type Port = Int
 type PID = Int
 
-data Msg = Send ByteString | Recv Int | Close
-
 -- We keep two queues. One is for sending messages, one is for receiving data.
-newtype SSHState =SSHState Channel
+newtype SSHState = SSHState Channel
 
 data Location = Location HostName Port
 

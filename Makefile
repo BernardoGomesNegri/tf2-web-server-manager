@@ -36,14 +36,15 @@ dist: final
 clean:
 	rm -rf $(BUILD)
 	rm -rf dist-newstyle
+	rm cabal.project.local*
 
 $(BUILD):
 	mkdir -p $(BUILD)
 	mkdir -p $(BUILD-FRONTEND)
 
 $(BUILD)/$(EXE-NAME): $(HS-SRC) $(BUILD)
-	$(CABAL) build $(CABAL-OPTS)
-	$(CABAL) install $(CABAL-OPTS) --installdir=$(BUILD) --install-method=copy --overwrite-policy=always
+	$(CABAL) build $(CABAL-OPTS) --flags=debug
+	$(CABAL) install --installdir=$(BUILD) --install-method=copy --overwrite-policy=always
 
 # This is the only way I found to maintain shell variables between
 # command execution. GNU Make actually runs each command in a separate

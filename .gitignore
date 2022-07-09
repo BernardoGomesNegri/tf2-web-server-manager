@@ -28,3 +28,7 @@ build/
 #elm
 frontend/elm-stuff
 frontend/repl-temp-*
+
+#emacs
+*~
+\#~#
